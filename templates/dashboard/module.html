@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ module.name }}{% endblock %}
+{% block page_title %}{{ module.name }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">Dashboard <span class="accent">/</span> {{ module.number }} {{ module.name }}</div>
+<div class="page-header">
+  <h2>{{ module.name }}</h2>
+  <p class="tagline">{{ module.tagline }}</p>
+</div>
+
+<div class="panel">
+  <table class="data-table">
+    <thead>
+      <tr>
+        {% for col in module.columns %}<th>{{ col }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in "xxx" %}
+      <tr class="skeleton-row">
+        {% for col in module.columns %}<td><div class="skeleton-bar"></div></td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="empty-state">
+    <div class="hex-badge">{{ module.number }}</div>
+    <h4>No {{ module.name|lower }} records yet</h4>
+    <p>This module is ready to go — entries will appear in this grid as soon as the {{ module.name }} database is connected.</p>
+    <span class="note">Awaiting database connection</span>
+  </div>
+</div>
+{% endblock %}

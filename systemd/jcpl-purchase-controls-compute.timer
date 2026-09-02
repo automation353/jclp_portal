@@ -1,0 +1,13 @@
+[Unit]
+Description=JCPL — Hourly recompute of The Seven Purchase Controls
+
+[Timer]
+# Two minutes after jcpl-purchase-dash-fetch.timer's :07 — that job fetches
+# the Combined tab and recomputes the nine dashboards first; this one reads
+# the snapshot it just wrote and recomputes Controls 3/4/6/7 from it. Never
+# fetches on its own, never touches the dashboards' timer or service.
+OnCalendar=*-*-* *:09:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

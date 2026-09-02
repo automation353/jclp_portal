@@ -1,0 +1,10 @@
+[Unit]
+Description=JCPL — Recompute The Seven Purchase Controls (Controls 3, 4, 6, 7)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/jclp_automation_portal/jcpl
+ExecStart=/root/jclp_automation_portal/jcpl/.venv/bin/python manage.py compute_purchase_controls
+StandardOutput=append:/root/jclp_automation_portal/jcpl/logs/purchase_controls_compute.log
+StandardError=append:/root/jclp_automation_portal/jcpl/logs/purchase_controls_compute.log

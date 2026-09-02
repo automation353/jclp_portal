@@ -1,0 +1,10 @@
+[Unit]
+Description=JCPL — Enforce upload retention (keep 2 most recent per module)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/jclp_automation_portal/jcpl
+ExecStart=/root/jclp_automation_portal/jcpl/.venv/bin/python manage.py enforce_upload_retention
+StandardOutput=append:/root/jclp_automation_portal/jcpl/logs/upload_retention.log
+StandardError=append:/root/jclp_automation_portal/jcpl/logs/upload_retention.log

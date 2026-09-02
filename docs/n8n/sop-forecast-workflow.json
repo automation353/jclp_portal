@@ -1,0 +1,266 @@
+{
+  "name": "S&OP Forecast vs Sales -> Google Sheet",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sop-forecast",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseData": "={{ { \"status\": \"accepted\", \"tab\": \"Forecast\", \"rows\": $json.row_count, \"chunk\": $json.chunk_index, \"action\": $json.action } }}",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "sop-forecast-0001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        400,
+        500
+      ],
+      "webhookId": "sop-forecast"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the S&OP upload payload from Django.\n// Supports chunked uploads for large files:\n//   action='replace' (chunk 0): clear tab then append\n//   action='append'  (chunk 1+): append only (no clear)\n\nconst input = $input.first().json;\nconst tabName = input.tab_name || 'Forecast';\nconst headers = input.headers || [];\nconst rows    = input.rows || [];\nconst meta    = input._meta || {};\nconst action  = input.action || 'replace';\n\nif (!rows.length) {\n  throw new Error('No rows in payload for Forecast');\n}\n\nreturn [{\n  json: {\n    tab_name: tabName,\n    report_key: input.report_key || 'sop_forecast',\n    headers: headers,\n    rows: rows,\n    row_count: rows.length,\n    action: action,\n    chunk_index: input.chunk_index || 0,\n    total_chunks: input.total_chunks || 1,\n    total_rows: input.total_rows || rows.length,\n    uploaded_by: meta.uploader || 'unknown',\n    uploaded_at: meta.uploaded_at || new Date().toISOString(),\n    original_file: meta.original_filename || '',\n  }\n}];"
+      },
+      "id": "sop-forecast-0002",
+      "name": "Parse Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "replace",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "sop-forecast-0010",
+      "name": "Is First Chunk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_SOP_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Forecast"
+        }
+      },
+      "id": "sop-forecast-0003",
+      "name": "Clear Forecast Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets \u2014 JCPL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expand rows array into individual n8n items.\nconst data = $('Parse Payload').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const ordered = {};\n  if (headers.length > 0) {\n    for (const h of headers) {\n      ordered[h] = row[h] !== undefined ? row[h] : '';\n    }\n  } else {\n    Object.assign(ordered, row);\n  }\n  return { json: ordered };\n});"
+      },
+      "id": "sop-forecast-0004",
+      "name": "Expand Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_SOP_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Forecast"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "sop-forecast-0005",
+      "name": "Append to Forecast",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets \u2014 JCPL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log summary\nconst data = $('Parse Payload').first().json;\nconst appended = $input.all().length;\nreturn [{ json: {\n  status: 'done',\n  tab: 'Forecast',\n  report_key: data.report_key,\n  action: data.action,\n  chunk: data.chunk_index + '/' + data.total_chunks,\n  rows_written: appended,\n  total_rows: data.total_rows,\n  uploaded_by: data.uploaded_by,\n  original_file: data.original_file,\n}}];"
+      },
+      "id": "sop-forecast-0006",
+      "name": "Log Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Payload": {
+      "main": [
+        [
+          {
+            "node": "Is First Chunk?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is First Chunk?": {
+      "main": [
+        [
+          {
+            "node": "Clear Forecast Tab",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Expand Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Forecast Tab": {
+      "main": [
+        [
+          {
+            "node": "Expand Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Rows": {
+      "main": [
+        [
+          {
+            "node": "Append to Forecast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append to Forecast": {
+      "main": [
+        [
+          {
+            "node": "Log Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "S&OP"
+    },
+    {
+      "name": "Forecast"
+    }
+  ],
+  "triggerCount": 1,
+  "_comment": [
+    "SETUP:",
+    "1. This workflow handles: Forecast vs Sales Report \u2014 original forecast, reviewed forecast, actual sales.",
+    "2. Source file pattern: Forecast_VS_Sales_Report_*.xlsx",
+    "3. Replace PASTE_YOUR_SOP_SHEET_ID in both Sheet nodes with the Google Sheet ID",
+    "4. The sheet must have a tab named exactly: Forecast",
+    "5. Webhook URL: https://jollyclamps.app.n8n.cloud/webhook/sop-forecast",
+    "6. Env var in /root/.env: JCLP_SOP_FORECAST_WEBHOOK",
+    "7. Credential: Google Sheets \u2014 JCPL (cTdqRAEN5iDJTYQk)",
+    "",
+    "CHUNKING:",
+    "- Django sends large files in chunks of 2,000 rows each.",
+    "- First chunk (action='replace'): clears the tab, then appends rows.",
+    "- Subsequent chunks (action='append'): appends rows only (no clear).",
+    "- The If node routes chunk 0 through Clear, others skip it."
+  ]
+}

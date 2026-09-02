@@ -1,0 +1,235 @@
+{
+  "name": "Excel Upload -> Google Sheet (Daily Refresh)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "excel-upload",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseData": "={{ { \"status\": \"accepted\", \"message\": \"Upload received. stock_valuation and stock_valuation_columns are refreshing in the background.\" } }}",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "3b356a3b-426c-4e36-b9f4-c6c38bb9206e",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        480,
+        928
+      ],
+      "webhookId": "excel-upload"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "file",
+        "options": {
+          "headerRow": true,
+          "includeEmptyCells": false
+        }
+      },
+      "id": "f6312490-fd3f-486c-a25a-53e97a4ad419",
+      "name": "Extract From File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        720,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nconst cleanedRows = [];\n\nfor (const item of rows) {\n  const row = item.json || {};\n\n  const hasAnyValue = Object.values(row).some(value => {\n    if (value === null || value === undefined) return false;\n    return String(value).trim() !== '';\n  });\n\n  if (!hasAnyValue) continue;\n\n  const cleanedRow = {};\n\n  for (const [key, value] of Object.entries(row)) {\n    const cleanKey = String(key || '')\n      .replace(/\\r/g, ' ')\n      .replace(/\\n/g, ' ')\n      .replace(/\\s+/g, ' ')\n      .trim();\n\n    if (!cleanKey) continue;\n    cleanedRow[cleanKey] = value;\n  }\n\n  cleanedRows.push(cleanedRow);\n}\n\nif (cleanedRows.length === 0) {\n  throw new Error('No usable data rows were extracted from the uploaded file.');\n}\n\nreturn [\n  {\n    json: {\n      rowCount: cleanedRows.length,\n      rows: cleanedRows\n    }\n  }\n];"
+      },
+      "id": "e5bea7f5-b820-497a-bd6b-04b2bc7c95a6",
+      "name": "Bundle Rows (collapse to 1 item)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1euJuqvIv7wHvwPejgCMOztJNGwU0eyTvPUioYLZZ4fg",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "stock_valuation",
+          "mode": "name"
+        }
+      },
+      "id": "ea10ce9c-3adb-447f-a93c-5a86ffd18bd8",
+      "name": "Clear Old Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1248,
+        928
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Bundle Rows (collapse to 1 item)').first().json;\nconst rows = source.rows || [];\n\nif (!Array.isArray(rows) || rows.length === 0) {\n  throw new Error('No bundled rows available for append.');\n}\n\nreturn rows.map(row => ({ json: row }));"
+      },
+      "id": "b6fb0fa7-3020-4762-94fc-bf1ab0fead2d",
+      "name": "Expand Rows For Append",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1euJuqvIv7wHvwPejgCMOztJNGwU0eyTvPUioYLZZ4fg",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "stock_valuation",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "useAppend": true
+        }
+      },
+      "id": "f306b17f-5090-4499-a983-71b86fc31a70",
+      "name": "Write Fresh Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1712,
+        928
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true
+            }
+          }
+        }
+      },
+      "id": "c1c1c1c1-0000-4000-8000-00000000000c",
+      "name": "Sync stock_valuation_columns via Apps Script",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1952,
+        928
+      ],
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract From File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract From File": {
+      "main": [
+        [
+          {
+            "node": "Bundle Rows (collapse to 1 item)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bundle Rows (collapse to 1 item)": {
+      "main": [
+        [
+          {
+            "node": "Clear Old Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Old Data": {
+      "main": [
+        [
+          {
+            "node": "Expand Rows For Append",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Rows For Append": {
+      "main": [
+        [
+          {
+            "node": "Write Fresh Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Fresh Data": {
+      "main": [
+        [
+          {
+            "node": "Sync stock_valuation_columns via Apps Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

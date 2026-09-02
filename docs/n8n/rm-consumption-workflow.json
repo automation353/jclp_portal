@@ -1,0 +1,152 @@
+{
+  "name": "RM Consumption Upload -> Google Sheet",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rm-consumption",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseData": "={{ { \"status\": \"accepted\", \"message\": \"RM Consumption upload received. rm_consumption tab is refreshing.\" } }}",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "rmc0-0000-4000-8000-000000000001",
+      "name": "Webhook (RM Consumption)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        400,
+        400
+      ],
+      "webhookId": "rm-consumption"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "file",
+        "options": {
+          "sheetName": "Highway",
+          "range": "A3:L2000",
+          "headerRow": true,
+          "includeEmptyCells": false
+        }
+      },
+      "id": "rmc0-0000-4000-8000-000000000002",
+      "name": "Extract Highway Sheet",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        640,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only the 4 columns needed for the RM dashboard, renaming to match\n// the tab's header order (RM Code | Tally Code | Category | Levels).\n// Source (Highway sheet):\n//   ERP Item Code -> RM Code\n//   Tally Code    -> Tally Code\n//   Type          -> Category\n//   Level         -> Levels\n\nconst rows = $input.all();\nconst out = [];\n\nfor (const item of rows) {\n  const r = item.json || {};\n  const rmCode    = r['ERP Item Code'] ?? r['ERP Code'] ?? '';\n  const tallyCode = r['Tally Code'] ?? '';\n  const category  = r['Type'] ?? r['Category'] ?? '';\n  const levels    = r['Level'] ?? r['Levels'] ?? '';\n\n  // Skip fully-blank rows.\n  if ([rmCode, tallyCode, category, levels].every(v => v === '' || v === null || v === undefined)) continue;\n\n  out.push({\n    'RM Code':    rmCode,\n    'Tally Code': tallyCode,\n    'Category':   category,\n    'Levels':     levels\n  });\n}\n\nif (out.length === 0) {\n  throw new Error('No usable rows extracted from RM Consumption / Highway sheet. Check that the sheet name is \"Highway\" and its header row is at row 3.');\n}\n\nreturn [{ json: { rowCount: out.length, rows: out } }];"
+      },
+      "id": "rmc0-0000-4000-8000-000000000003",
+      "name": "Bundle RM Consumption Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1euJuqvIv7wHvwPejgCMOztJNGwU0eyTvPUioYLZZ4fg",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "rm_consumption",
+          "mode": "name"
+        }
+      },
+      "id": "rmc0-0000-4000-8000-000000000004",
+      "name": "Clear rm_consumption Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Bundle RM Consumption Rows').first().json;\nconst rows = source.rows || [];\nif (!Array.isArray(rows) || rows.length === 0) throw new Error('No bundled rows for rm_consumption.');\nreturn rows.map(row => ({ json: row }));"
+      },
+      "id": "rmc0-0000-4000-8000-000000000005",
+      "name": "Expand rm_consumption Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1euJuqvIv7wHvwPejgCMOztJNGwU0eyTvPUioYLZZ4fg",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "rm_consumption",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "useAppend": true
+        }
+      },
+      "id": "rmc0-0000-4000-8000-000000000006",
+      "name": "Write rm_consumption Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1600,
+        400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook (RM Consumption)": { "main": [[{ "node": "Extract Highway Sheet", "type": "main", "index": 0 }]] },
+    "Extract Highway Sheet": { "main": [[{ "node": "Bundle RM Consumption Rows", "type": "main", "index": 0 }]] },
+    "Bundle RM Consumption Rows": { "main": [[{ "node": "Clear rm_consumption Tab", "type": "main", "index": 0 }]] },
+    "Clear rm_consumption Tab": { "main": [[{ "node": "Expand rm_consumption Rows", "type": "main", "index": 0 }]] },
+    "Expand rm_consumption Rows": { "main": [[{ "node": "Write rm_consumption Rows", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" }
+}

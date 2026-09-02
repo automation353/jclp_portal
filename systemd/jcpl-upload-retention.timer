@@ -1,0 +1,11 @@
+[Unit]
+Description=JCPL — Daily upload retention sweep
+
+[Timer]
+# Once a day, offset from the other daily job (jcpl-mto-mts-lock at 00:05)
+# so they never race on the same tables.
+OnCalendar=*-*-* 00:20:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

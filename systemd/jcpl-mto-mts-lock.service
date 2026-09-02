@@ -1,0 +1,10 @@
+[Unit]
+Description=JCPL — Sweep expired MTO/MTS uploads into LOCKED status
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/jclp_automation_portal/jcpl
+ExecStart=/root/jclp_automation_portal/jcpl/.venv/bin/python manage.py lock_mto_mts_uploads
+StandardOutput=append:/root/jclp_automation_portal/jcpl/logs/mto_mts_lock.log
+StandardError=append:/root/jclp_automation_portal/jcpl/logs/mto_mts_lock.log

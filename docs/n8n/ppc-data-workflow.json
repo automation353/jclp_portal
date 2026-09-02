@@ -1,0 +1,166 @@
+{
+  "name": "PPC Data -> Google Sheet (Masters, Demand, MPS, R3SS)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ppc-data",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseData": "={{ { \"status\": \"accepted\", \"tab\": $json.tab_name, \"rows\": $json.row_count } }}",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "d1e2f3a4-0001-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [400, 500],
+      "webhookId": "ppc-data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract payload from Django PPC portal.\n// Expected: { report_key, tab_name, headers, rows, row_count, _meta }\n//\n// The portal sends human-readable header-keyed rows — ready for the sheet.\n// We just pass through tab_name + rows and add a timestamp header row.\n\nconst input = $input.first().json;\nconst tabName = input.tab_name;\nconst headers = input.headers || [];\nconst rows    = input.rows || [];\nconst meta    = input._meta || {};\n\nif (!tabName) {\n  throw new Error('Missing tab_name in payload — report_key: ' + (input.report_key || 'unknown'));\n}\nif (!rows.length) {\n  throw new Error('No rows in payload for tab: ' + tabName);\n}\n\n// Pass metadata forward for the Sheet nodes\nreturn [{\n  json: {\n    tab_name: tabName,\n    report_key: input.report_key,\n    headers: headers,\n    rows: rows,\n    row_count: rows.length,\n    uploaded_by: meta.uploader || 'unknown',\n    uploaded_at: meta.uploaded_at || new Date().toISOString(),\n    original_file: meta.original_filename || '',\n  }\n}];"
+      },
+      "id": "d1e2f3a4-0002-4000-8000-000000000002",
+      "name": "Parse Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 500]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_PPC_DATA_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $json.tab_name }}"
+        }
+      },
+      "id": "d1e2f3a4-0003-4000-8000-000000000003",
+      "name": "Clear Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets — JCPL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expand the rows array into individual n8n items for Sheets append.\n// Each item becomes one row in the Google Sheet.\n\nconst data = $input.first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\n\n// Google Sheets node in 'append' mode with headerRow=autoMapInputData\n// will use the first item's keys as column headers.\n\nreturn rows.map(row => {\n  // Ensure consistent column order matching headers\n  const ordered = {};\n  for (const h of headers) {\n    ordered[h] = row[h] !== undefined ? row[h] : '';\n  }\n  return { json: ordered };\n});"
+      },
+      "id": "d1e2f3a4-0004-4000-8000-000000000004",
+      "name": "Expand Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 500]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_PPC_DATA_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $('Parse Payload').first().json.tab_name }}"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "d1e2f3a4-0005-4000-8000-000000000005",
+      "name": "Append Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1380, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets — JCPL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log summary — optional, for the n8n execution log.\nconst data = $('Parse Payload').first().json;\nconst appended = $input.all().length;\n\nreturn [{\n  json: {\n    status: 'done',\n    tab: data.tab_name,\n    report_key: data.report_key,\n    rows_written: appended,\n    uploaded_by: data.uploaded_by,\n    uploaded_at: data.uploaded_at,\n    original_file: data.original_file,\n  }\n}];"
+      },
+      "id": "d1e2f3a4-0006-4000-8000-000000000006",
+      "name": "Log Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1620, 500]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{"node": "Parse Payload", "type": "main", "index": 0}]
+      ]
+    },
+    "Parse Payload": {
+      "main": [
+        [{"node": "Clear Tab", "type": "main", "index": 0}]
+      ]
+    },
+    "Clear Tab": {
+      "main": [
+        [{"node": "Expand Rows", "type": "main", "index": 0}]
+      ]
+    },
+    "Expand Rows": {
+      "main": [
+        [{"node": "Append Rows", "type": "main", "index": 0}]
+      ]
+    },
+    "Append Rows": {
+      "main": [
+        [{"node": "Log Summary", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {"name": "PPC"},
+    {"name": "Masters"},
+    {"name": "Plan Data"}
+  ],
+  "triggerCount": 1,
+  "_comment": [
+    "SETUP INSTRUCTIONS:",
+    "1. Create a Google Sheet named 'JCPL PPC Data'",
+    "2. Add 20 tabs with EXACT names:",
+    "   Item Master, Family Hierarchy, Route Master, Stage Map,",
+    "   Capacity PPP, Machine Master, Batch EBQ, Lead Time,",
+    "   BOM Master, Part Engineering, Customer Part, Stock Policy,",
+    "   Packing Spec, Rate ASP,",
+    "   Demand Freeze, Demand History,",
+    "   MPS Schedule, MPS History,",
+    "   R3SS Plan, R3SS Summary",
+    "3. Replace PASTE_YOUR_PPC_DATA_SHEET_ID with the actual sheet ID",
+    "4. The Google Sheets credential (cTdqRAEN5iDJTYQk) must have edit access",
+    "5. Import this workflow into n8n and activate it",
+    "6. The webhook URL is: https://jollyclamps.app.n8n.cloud/webhook/ppc-data"
+  ]
+}

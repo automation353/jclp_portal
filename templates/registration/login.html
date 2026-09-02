@@ -1,0 +1,54 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in — JCPL Workspace</title>
+<link rel="icon" href="{% static 'img/jolly-clamps-logo.png' %}">
+<link rel="stylesheet" href="{% static 'css/style.css' %}?v={% now 'U' %}">
+</head>
+<body>
+<div class="login-shell">
+  <div class="bolt-field"></div>
+  <div style="width:100%; max-width:400px;">
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="{% static 'img/jolly-clamps-logo.png' %}" alt="Jolly Clamps" class="login-logo">
+      </div>
+
+      <h2>Sign in to your workspace</h2>
+      <p class="sub">Use your Admin or Super Admin credentials.</p>
+
+      {% if form.non_field_errors %}
+      <ul class="messages">
+        {% for error in form.non_field_errors %}
+        <li class="error">{{ error }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      <form method="post" class="form-grid">
+        {% csrf_token %}
+        <div class="form-row">
+          <label for="{{ form.username.id_for_label }}">Username</label>
+          {{ form.username }}
+        </div>
+        <div class="form-row">
+          <label for="{{ form.password.id_for_label }}">Password</label>
+          {{ form.password }}
+        </div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button type="submit" class="btn btn-accent" style="width:100%; justify-content:center;">Sign in</button>
+      </form>
+
+      <div class="login-footnote">
+        Access is limited to two roles — <strong>Admin</strong> and <strong>Super Admin</strong>.
+        Lost your password? Ask your Super Admin to reset it from Team Accounts.
+      </div>
+    </div>
+    <div class="login-page-footer">JCPL WORKSPACE · INTERNAL USE ONLY</div>
+  </div>
+</div>
+</body>
+</html>

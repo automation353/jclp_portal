@@ -1,0 +1,12 @@
+[Unit]
+Description=JCPL — Hourly refresh of Purchase Control Dashboards
+
+[Timer]
+# Group A wants hourly refresh; A is the tightest cadence, so we run on
+# the hour every hour. Groups B/C are daily/weekly on the brief but the
+# extra compute is negligible.
+OnCalendar=*-*-* *:07:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

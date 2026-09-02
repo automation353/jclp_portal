@@ -1,0 +1,140 @@
+{
+  "name": "ERP #1 \u2014 erp_item_master \u2192 Django (on_change)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "af813255-da99-4ea8-b880-17e7f01039c7",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.ERP_BASE_URL }}/api/reports/erp_item_master",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 120000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "bfa1e43f-7fdd-42aa-8f8e-3fc579501c71",
+      "name": "Pull from ERP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PASTE_ERP_CREDENTIAL_ID",
+          "name": "TCS iON API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ERP feed: erp_item_master\n// Expected columns from ERP: Item Code, Item Description, Item Type, Item Category, Item Group...\n//\n// Adapt the input parsing below to match your ERP's actual response format.\n// The output must be a single item with {report_key, rows, meta}.\n\nconst input = $input.first().json;\n\n// --- ADAPT THIS SECTION ---\n// If your ERP returns {data: [{...}, ...]}:\nlet rawRows = input.data || input.rows || input.results || [];\n\n// If the response IS the array directly:\nif (Array.isArray(input)) rawRows = input;\n\n// --- END ADAPT ---\n\nconst expectedColumns = [\n  \"Item Code\",\n  \"Item Description\",\n  \"Item Type\",\n  \"Item Category\",\n  \"Item Group\",\n  \"HSN Code\",\n  \"Site\",\n  \"Status\",\n  \"UOM\",\n  \"Sub Group\",\n  \"Created Date\",\n  \"Modified Date\"\n];\n\n// Clean rows: trim strings, remove fully-empty rows\nconst cleanedRows = [];\nfor (const raw of rawRows) {\n  const row = {};\n  let hasValue = false;\n\n  for (const [key, value] of Object.entries(raw)) {\n    const cleanKey = String(key).replace(/\\r|\\n/g, ' ').replace(/\\s+/g, ' ').trim();\n    if (!cleanKey) continue;\n\n    if (value === null || value === undefined) continue;\n    const strVal = String(value).trim();\n    if (strVal === '') continue;\n\n    row[cleanKey] = value;\n    hasValue = true;\n  }\n\n  if (hasValue) cleanedRows.push(row);\n}\n\n// Build the payload for Django's /api/ppc-data/erp-landing/\nreturn [{\n  json: {\n    report_key: 'erp_item_master',\n    rows: cleanedRows,\n    meta: {\n      pulled_at: new Date().toISOString(),\n      report_name: 'erp_item_master',\n      row_count: cleanedRows.length,\n      source: 'n8n_scheduled',\n    }\n  }\n}];\n"
+      },
+      "id": "0ed9bc2b-7f0e-4b34-b936-23b69058f492",
+      "name": "Clean & Transform",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://200.141.14.164/api/ppc-data/erp-landing/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($input.first().json) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "3bf6e945-1cfb-4b77-9cbb-4ae62538a542",
+      "name": "POST to Django",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Pull from ERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pull from ERP": {
+      "main": [
+        [
+          {
+            "node": "Clean & Transform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean & Transform": {
+      "main": [
+        [
+          {
+            "node": "POST to Django",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "ERP Feed"
+    },
+    {
+      "name": "#1"
+    },
+    {
+      "name": "on_change"
+    }
+  ]
+}

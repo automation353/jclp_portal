@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Team Accounts{% endblock %}
+{% block page_title %}Team Accounts{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">Dashboard <span class="accent">/</span> Administration <span class="accent">/</span> Team Accounts</div>
+<div class="toolbar">
+  <div class="page-header" style="margin-bottom:0;">
+    <h2>Admin &amp; Super Admin accounts</h2>
+    <p class="tagline">Every login to the JCPL workspace, and the role each one holds.</p>
+  </div>
+  <a href="{% url 'team_create' %}" class="btn btn-accent">+ Add account</a>
+</div>
+
+<div class="panel">
+  <div class="table-scroll">
+  <table class="data-table team-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Department</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for account in team %}
+      <tr>
+        <td><strong>{{ account.username }}</strong></td>
+        <td>{{ account.get_full_name|default:"—" }}</td>
+        <td>{{ account.get_role_display }}</td>
+        <td>{{ account.department|default:"—" }}</td>
+        <td>
+          <span class="status-pill {% if account.is_active %}active{% else %}inactive{% endif %}">
+            {% if account.is_active %}Active{% else %}Disabled{% endif %}
+          </span>
+        </td>
+        <td style="text-align:right; white-space:nowrap;">
+          <a href="{% url 'team_edit' account.pk %}" class="btn btn-ghost btn-sm">Edit</a>
+          {% if account != request.user %}
+          <form method="post" action="{% url 'team_toggle_active' account.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-ghost btn-sm">
+              {% if account.is_active %}Disable{% else %}Reactivate{% endif %}
+            </button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

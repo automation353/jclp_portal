@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="620" viewBox="0 0 1100 620" font-family="Arial, Helvetica, sans-serif">
+  <rect width="1100" height="620" fill="#ffffff"/>
+
+  <text x="550" y="34" text-anchor="middle" font-size="22" font-weight="bold" fill="#1b2733">What happens after "combined" — the JCPL Portal side</text>
+  <text x="550" y="56" text-anchor="middle" font-size="13" fill="#5a6b7a">Nobody reads the Google Sheet directly — the portal pulls it, stores it, and computes every board from that copy</text>
+
+  <!-- combined tab -->
+  <rect x="440" y="86" width="220" height="56" rx="8" fill="#fff3d6" stroke="#c9962e" stroke-width="2"/>
+  <text x="550" y="118" text-anchor="middle" font-size="13" font-weight="bold" fill="#5a3d05">combined  (Google Sheet)</text>
+
+  <defs>
+    <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#4a6a8c"/>
+    </marker>
+  </defs>
+
+  <line x1="550" y1="142" x2="550" y2="180" stroke="#4a6a8c" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  <text x="700" y="165" text-anchor="middle" font-size="10.5" font-style="italic" fill="#4a6a8c">hourly, on the hour (:07) — reads the CSV export, no login needed</text>
+
+  <!-- fetch job -->
+  <rect x="400" y="188" width="300" height="56" rx="8" fill="#dce9f7" stroke="#4a78b0" stroke-width="1.5"/>
+  <text x="550" y="212" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1b2733">fetch_combined_sheet</text>
+  <text x="550" y="230" text-anchor="middle" font-size="10.5" fill="#2e4a68">Django scheduled job — reads, then stores a snapshot</text>
+
+  <line x1="550" y1="244" x2="550" y2="282" stroke="#4a6a8c" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  <text x="800" y="267" text-anchor="middle" font-size="10.5" font-style="italic" fill="#4a6a8c">rejected if 0 usable rows found — last good snapshot stays live (fixed 20 Aug 2026)</text>
+
+  <!-- snapshot store -->
+  <rect x="400" y="290" width="300" height="56" rx="8" fill="#e8ecf1" stroke="#8a97a6" stroke-width="1.5"/>
+  <text x="550" y="314" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#1b2733">PurchaseDashSnapshot</text>
+  <text x="550" y="330" text-anchor="middle" font-size="10.5" fill="#455261">One row per item, stable-keyed — the portal's own copy</text>
+
+  <line x1="550" y1="346" x2="550" y2="384" stroke="#4a6a8c" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  <text x="820" y="369" text-anchor="middle" font-size="10.5" font-style="italic" fill="#4a6a8c">2 minutes later — two independent compute jobs read this same snapshot</text>
+
+  <!-- two compute boxes -->
+  <rect x="150" y="392" width="360" height="70" rx="8" fill="#dff2e3" stroke="#3d8b52" stroke-width="1.5"/>
+  <text x="330" y="416" text-anchor="middle" font-size="13" font-weight="bold" fill="#1b2733">9 Purchase Control Dashboards</text>
+  <text x="330" y="434" text-anchor="middle" font-size="10.5" fill="#2e5a3a">Procurement action, stock-out risk, valuation,</text>
+  <text x="330" y="448" text-anchor="middle" font-size="10.5" fill="#2e5a3a">slow-moving, data trust, signal conflict...</text>
+
+  <rect x="590" y="392" width="360" height="70" rx="8" fill="#dff2e3" stroke="#3d8b52" stroke-width="1.5"/>
+  <text x="770" y="416" text-anchor="middle" font-size="13" font-weight="bold" fill="#1b2733">4 built Purchase Controls</text>
+  <text x="770" y="434" text-anchor="middle" font-size="10.5" fill="#2e5a3a">Control 3 (dead stock) · Control 4 (cover vs. lead time) ·</text>
+  <text x="770" y="448" text-anchor="middle" font-size="10.5" fill="#2e5a3a">Control 6 (item-code validity) · Control 7 (real zero vs. failed lookup)</text>
+
+  <line x1="330" y1="462" x2="330" y2="500" stroke="#3d8b52" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  <line x1="770" y1="462" x2="770" y2="500" stroke="#3d8b52" stroke-width="1.5" marker-end="url(#arrow2)"/>
+
+  <!-- portal UI -->
+  <rect x="150" y="508" width="800" height="56" rx="8" fill="#f0f4f8" stroke="#6b7f93" stroke-width="1.5"/>
+  <text x="550" y="532" text-anchor="middle" font-size="13" font-weight="bold" fill="#1b2733">JCPL Portal — Purchase &gt; Dashboards</text>
+  <text x="550" y="548" text-anchor="middle" font-size="10.5" fill="#455261">Every tile is clickable — drills to the exact rows behind the number, with CSV export</text>
+
+  <line x1="550" y1="564" x2="550" y2="580" stroke="#6b7f93" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  <text x="550" y="602" text-anchor="middle" font-size="12" fill="#455261">Buyer · Plant Head · CFO · MD · Audit</text>
+</svg>

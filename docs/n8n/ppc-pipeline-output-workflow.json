@@ -1,0 +1,305 @@
+{
+  "name": "PPC Pipeline Output -> Google Sheet (BOM, Shortages, Scorecard)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ppc-pipeline-output",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseData": "={{ { \"status\": \"accepted\", \"message\": \"Pipeline output received. Writing to sheet.\" } }}",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [400, 500],
+      "webhookId": "ppc-pipeline-output"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route by type: bom_explosion or scorecard\nconst input = $input.first().json;\nconst type = input.type || 'unknown';\n\nif (type === 'bom_explosion') {\n  // Extract BOM components and shortages\n  const bomRows = (input.bom_components || {}).rows || [];\n  const shortageRows = (input.shortages || {}).rows || [];\n  \n  return [{\n    json: {\n      type: 'bom_explosion',\n      plan_month: input.plan_month,\n      release_number: input.release_number,\n      bom_rows: bomRows,\n      shortage_rows: shortageRows,\n      bom_count: bomRows.length,\n      shortage_count: shortageRows.length,\n    }\n  }];\n} else if (type === 'scorecard') {\n  const sections = (input.sections || {}).rows || [];\n  \n  return [{\n    json: {\n      type: 'scorecard',\n      plan_month: input.plan_month,\n      release_number: input.release_number,\n      overall: input.overall || {},\n      section_rows: sections,\n    }\n  }];\n}\n\nthrow new Error(`Unknown pipeline output type: ${type}`);"
+      },
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Route by Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "cond-bom",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "bom_explosion",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Is BOM?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expand BOM rows for Google Sheets append\nconst data = $input.first().json;\nconst rows = data.bom_rows || [];\n\nreturn rows.map(row => ({ json: row }));"
+      },
+      "id": "a1b2c3d4-0004-4000-8000-000000000004",
+      "name": "Expand BOM Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 380]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_PPC_PIPELINE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "BOM Requirements"
+        }
+      },
+      "id": "a1b2c3d4-0005-4000-8000-000000000005",
+      "name": "Clear BOM Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 240],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_PPC_PIPELINE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "BOM Requirements"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0006-4000-8000-000000000006",
+      "name": "Append BOM Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1360, 380],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expand shortage rows for Google Sheets\nconst data = $input.first().json;\nconst rows = data.shortage_rows || [];\n\nreturn rows.map(row => ({ json: row }));"
+      },
+      "id": "a1b2c3d4-0007-4000-8000-000000000007",
+      "name": "Expand Shortage Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 520]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_PPC_PIPELINE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Shortages"
+        }
+      },
+      "id": "a1b2c3d4-0008-4000-8000-000000000008",
+      "name": "Clear Shortages Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 660],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_PPC_PIPELINE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Shortages"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0009-4000-8000-000000000009",
+      "name": "Append Shortage Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1360, 520],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Expand scorecard section rows\nconst data = $input.first().json;\nconst overall = data.overall || {};\nconst sections = data.section_rows || [];\n\n// First row: overall summary\nconst rows = [{\n  Section: 'OVERALL',\n  Planned: overall['Planned'] || 0,\n  Actual: overall['Actual'] || 0,\n  'Adherence %': overall['Adherence %'] || 0,\n  Backlog: overall['Backlog'] || 0,\n  Rejected: overall['Rejected'] || 0,\n  'Rejection %': overall['Rejection %'] || 0,\n}];\n\n// Section rows\nfor (const s of sections) {\n  rows.push(s);\n}\n\nreturn rows.map(r => ({ json: r }));"
+      },
+      "id": "a1b2c3d4-0010-4000-8000-000000000010",
+      "name": "Expand Scorecard Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 800]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_PPC_PIPELINE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Scorecard"
+        }
+      },
+      "id": "a1b2c3d4-0011-4000-8000-000000000011",
+      "name": "Clear Scorecard Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 940],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_YOUR_PPC_PIPELINE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Scorecard"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0012-4000-8000-000000000012",
+      "name": "Append Scorecard Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1360, 800],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Route by Type", "type": "main", "index": 0}]]
+    },
+    "Route by Type": {
+      "main": [[{"node": "Is BOM?", "type": "main", "index": 0}]]
+    },
+    "Is BOM?": {
+      "main": [
+        [
+          {"node": "Expand BOM Rows", "type": "main", "index": 0},
+          {"node": "Clear BOM Tab", "type": "main", "index": 0},
+          {"node": "Expand Shortage Rows", "type": "main", "index": 0},
+          {"node": "Clear Shortages Tab", "type": "main", "index": 0}
+        ],
+        [
+          {"node": "Expand Scorecard Rows", "type": "main", "index": 0},
+          {"node": "Clear Scorecard Tab", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Clear BOM Tab": {
+      "main": [[{"node": "Append BOM Rows", "type": "main", "index": 0}]]
+    },
+    "Expand BOM Rows": {
+      "main": [[{"node": "Append BOM Rows", "type": "main", "index": 0}]]
+    },
+    "Clear Shortages Tab": {
+      "main": [[{"node": "Append Shortage Rows", "type": "main", "index": 0}]]
+    },
+    "Expand Shortage Rows": {
+      "main": [[{"node": "Append Shortage Rows", "type": "main", "index": 0}]]
+    },
+    "Clear Scorecard Tab": {
+      "main": [[{"node": "Append Scorecard Rows", "type": "main", "index": 0}]]
+    },
+    "Expand Scorecard Rows": {
+      "main": [[{"node": "Append Scorecard Rows", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {"name": "PPC Pipeline"},
+    {"name": "Output to Sheet"}
+  ]
+}

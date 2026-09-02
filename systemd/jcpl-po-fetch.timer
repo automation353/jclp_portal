@@ -1,0 +1,11 @@
+[Unit]
+Description=JCPL — Hourly refresh of the po tab (Control 5)
+
+[Timer]
+# :05 — two minutes before the combined fetch at :07 and four before the
+# controls compute at :09, so Control 5 always reads fresh PO lines.
+OnCalendar=*-*-* *:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

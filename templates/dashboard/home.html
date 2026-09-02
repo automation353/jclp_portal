@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load dashboard_extras %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>Welcome back, {{ user.first_name|default:user.username }}.</h2>
+  <p class="tagline">Here's the full department menu for JCPL. Modules will populate once the production database is connected.</p>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-card"><div class="value">0</div><div class="label">Open purchase orders</div></div>
+  <div class="stat-card"><div class="value">0</div><div class="label">Active employees</div></div>
+  <div class="stat-card"><div class="value">0</div><div class="label">Sales orders this month</div></div>
+  <div class="stat-card"><div class="value">0</div><div class="label">Work orders in progress</div></div>
+</div>
+
+<div class="module-grid">
+  {% for m in modules %}
+  <a class="module-card" href="{% url 'dashboard:module' m.slug %}">
+    <div class="module-card-top">
+      <div class="hex-badge">{{ m.number }}</div>
+    </div>
+    <h3>{{ m.name }}</h3>
+    <p>{{ m.tagline }}</p>
+    <span class="module-link">Open module →</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

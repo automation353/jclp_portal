@@ -1,0 +1,793 @@
+[ok] fetched snapshot #2  rows=392  in 0.70s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #3  rows=392  in 3.74s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #4  rows=392  in 2.25s
+[ok] computed 9 dashboard(s) in 0.07s
+[ok] fetched snapshot #5  rows=392  in 1.80s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #6  rows=392  in 0.58s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #7  rows=392  in 1.65s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #8  rows=392  in 0.89s
+[ok] computed 9 dashboard(s) in 0.06s
+[ok] fetched snapshot #9  rows=392  in 1.53s
+[ok] computed 9 dashboard(s) in 0.06s
+[ok] fetched snapshot #10  rows=392  in 1.17s
+[ok] computed 9 dashboard(s) in 0.07s
+[ok] fetched snapshot #11  rows=392  in 1.20s
+[ok] computed 9 dashboard(s) in 0.06s
+[ok] fetched snapshot #12  rows=392  in 1.16s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #13  rows=392  in 1.02s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #14  rows=392  in 2.23s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #15  rows=392  in 1.77s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #16  rows=392  in 1.91s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #17  rows=392  in 1.76s
+[ok] computed 9 dashboard(s) in 0.06s
+[ok] fetched snapshot #18  rows=392  in 1.96s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #19  rows=392  in 1.69s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #20  rows=392  in 2.04s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #21  rows=392  in 1.87s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #22  rows=392  in 1.81s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #23  rows=392  in 2.64s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #24  rows=392  in 2.04s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #25  rows=392  in 1.54s
+[ok] computed 9 dashboard(s) in 0.09s
+[fail] fetch failed: The read operation timed out
+[ok] fetched snapshot #27  rows=392  in 0.79s
+[ok] computed 9 dashboard(s) in 0.09s
+[ok] fetched snapshot #28  rows=392  in 2.15s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #29  rows=392  in 1.87s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #30  rows=392  in 1.11s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #31  rows=392  in 2.10s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #32  rows=392  in 2.21s
+[ok] computed 9 dashboard(s) in 0.19s
+[ok] fetched snapshot #33  rows=392  in 1.24s
+[ok] computed 9 dashboard(s) in 0.07s
+[ok] fetched snapshot #34  rows=392  in 1.27s
+[ok] computed 9 dashboard(s) in 0.09s
+[ok] fetched snapshot #35  rows=392  in 3.09s
+[ok] computed 9 dashboard(s) in 0.21s
+[ok] fetched snapshot #36  rows=392  in 1.91s
+[ok] computed 9 dashboard(s) in 0.11s
+[ok] fetched snapshot #37  rows=392  in 1.93s
+[ok] computed 9 dashboard(s) in 0.13s
+[ok] fetched snapshot #38  rows=392  in 2.60s
+[ok] computed 9 dashboard(s) in 0.11s
+[ok] fetched snapshot #39  rows=392  in 2.13s
+[ok] computed 9 dashboard(s) in 0.10s
+[ok] fetched snapshot #40  rows=392  in 17.09s
+[ok] computed 9 dashboard(s) in 0.09s
+[ok] fetched snapshot #41  rows=392  in 2.08s
+[ok] computed 9 dashboard(s) in 0.12s
+[ok] fetched snapshot #42  rows=392  in 2.43s
+[ok] computed 9 dashboard(s) in 0.14s
+[ok] fetched snapshot #43  rows=392  in 2.57s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #44  rows=392  in 1.57s
+[ok] computed 9 dashboard(s) in 0.12s
+[ok] fetched snapshot #45  rows=392  in 1.24s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #46  rows=392  in 2.08s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #47  rows=392  in 2.73s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #48  rows=392  in 2.39s
+[ok] computed 9 dashboard(s) in 0.20s
+[ok] fetched snapshot #49  rows=392  in 0.84s
+[ok] computed 9 dashboard(s) in 0.20s
+[ok] fetched snapshot #50  rows=392  in 1.93s
+[ok] computed 9 dashboard(s) in 0.09s
+[ok] fetched snapshot #51  rows=392  in 1.89s
+[ok] computed 9 dashboard(s) in 0.09s
+[ok] fetched snapshot #52  rows=392  in 1.96s
+[ok] computed 9 dashboard(s) in 0.20s
+[ok] fetched snapshot #53  rows=392  in 1.24s
+[ok] computed 9 dashboard(s) in 0.07s
+[ok] fetched snapshot #54  rows=392  in 0.97s
+[ok] computed 9 dashboard(s) in 0.08s
+[ok] fetched snapshot #56  rows=0  in 0.99s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #57  rows=0  in 0.67s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #58  rows=0  in 1.73s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #59  rows=0  in 1.68s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #60  rows=0  in 1.16s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #61  rows=0  in 2.00s
+[ok] computed 9 dashboard(s) in 0.05s
+[ok] fetched snapshot #62  rows=0  in 1.45s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #63  rows=0  in 2.24s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #64  rows=0  in 1.46s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #65  rows=0  in 1.97s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #66  rows=0  in 2.51s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #67  rows=0  in 2.13s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #68  rows=0  in 1.80s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #69  rows=0  in 6.54s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #70  rows=0  in 1.92s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #71  rows=0  in 1.19s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #72  rows=0  in 1.83s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #73  rows=0  in 2.29s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #74  rows=0  in 1.50s
+[ok] computed 9 dashboard(s) in 0.03s
+[ok] fetched snapshot #75  rows=0  in 0.79s
+[ok] computed 9 dashboard(s) in 0.04s
+[ok] fetched snapshot #77  rows=392  in 0.65s
+[ok] computed 9 dashboard(s) in 0.08s
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+Subject: [JCPL Portal] Combined-tab fetch OK =?utf-8?b?4oCU?= snapshot #79,
+ 392 rows
+From: no-reply@jollyclamps.local
+To: automation@jollyclamps.com
+Date: Thu, 20 Aug 2026 08:07:36 +0000
+Message-ID: <178721325684.421847.3651619393178779262@ubuntu-24.localhost>
+
+Fetched sheet 1euJuqvIv7wHvwPejgCMOztJNGwU0eyTvPUioYLZZ4fg (gid 1942899352) a=
+t 2026-08-20 08:07:36.822999+00:00 and promoted snapshot #79 to current with =
+392 rows. Dashboards and controls will pick this up on their next scheduled r=
+ecompute.
+
+-------------------------------------------------------------------------------
+[ok] fetched snapshot #79  rows=392  in 1.73s
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+MIME-Version: 1.0
+Subject: [JCPL Portal] Dashboards recomputed =?utf-8?b?4oCU?= snapshot #79
+From: no-reply@jollyclamps.local
+To: automation@jollyclamps.com
+Date: Thu, 20 Aug 2026 08:07:36 +0000
+Message-ID: <178721325691.421847.13145932702072000120@ubuntu-24.localhost>
+
+Recomputed 9 dashboard(s) against snapshot #79 (392 rows).
+
+-------------------------------------------------------------------------------
+[ok] computed 9 dashboard(s) in 0.07s
+[ok] fetched snapshot #80  rows=392  in 5.16s
+[ok] computed 9 dashboard(s) in 3.28s
+[ok] fetched snapshot #81  rows=392  in 4.97s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #82  rows=392  in 6.24s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #83  rows=392  in 9.49s
+[ok] computed 9 dashboard(s) in 3.44s
+[ok] fetched snapshot #84  rows=392  in 5.52s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #85  rows=392  in 10.30s
+[ok] computed 9 dashboard(s) in 6.16s
+[ok] fetched snapshot #86  rows=392  in 6.03s
+[ok] computed 9 dashboard(s) in 3.48s
+[ok] fetched snapshot #87  rows=392  in 29.99s
+[ok] computed 9 dashboard(s) in 12.31s
+[ok] fetched snapshot #88  rows=392  in 6.37s
+[ok] computed 9 dashboard(s) in 3.15s
+[ok] fetched snapshot #89  rows=392  in 5.12s
+[ok] computed 9 dashboard(s) in 3.36s
+[ok] fetched snapshot #90  rows=392  in 5.09s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #91  rows=392  in 5.04s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #92  rows=392  in 5.82s
+[ok] computed 9 dashboard(s) in 3.29s
+[ok] fetched snapshot #93  rows=392  in 5.28s
+[ok] computed 9 dashboard(s) in 3.15s
+[ok] fetched snapshot #94  rows=392  in 5.20s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #95  rows=392  in 4.71s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #96  rows=392  in 4.71s
+[ok] computed 9 dashboard(s) in 3.31s
+[ok] fetched snapshot #97  rows=392  in 8.56s
+[ok] computed 9 dashboard(s) in 4.93s
+[ok] fetched snapshot #98  rows=0  in 5.40s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #99  rows=0  in 3.99s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #100  rows=0  in 4.89s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #101  rows=0  in 4.54s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #102  rows=392  in 4.29s
+[ok] computed 9 dashboard(s) in 3.51s
+[ok] fetched snapshot #103  rows=392  in 4.38s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #105  rows=392  in 4.96s
+[ok] computed 9 dashboard(s) in 3.39s
+[ok] fetched snapshot #107  rows=392  in 4.00s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #108  rows=392  in 4.11s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #109  rows=392  in 4.35s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #112  rows=392  in 7.34s
+[ok] computed 9 dashboard(s) in 4.23s
+[ok] fetched snapshot #113  rows=392  in 5.67s
+[ok] computed 9 dashboard(s) in 3.53s
+[ok] fetched snapshot #114  rows=392  in 7.01s
+[ok] computed 9 dashboard(s) in 3.23s
+[ok] fetched snapshot #115  rows=392  in 6.76s
+[ok] computed 9 dashboard(s) in 3.71s
+[ok] fetched snapshot #116  rows=392  in 5.82s
+[ok] computed 9 dashboard(s) in 3.39s
+[ok] fetched snapshot #117  rows=392  in 7.21s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #118  rows=392  in 6.27s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #119  rows=392  in 6.32s
+[ok] computed 9 dashboard(s) in 3.06s
+[ok] fetched snapshot #120  rows=392  in 6.64s
+[ok] computed 9 dashboard(s) in 3.13s
+[ok] fetched snapshot #121  rows=392  in 6.39s
+[ok] computed 9 dashboard(s) in 3.23s
+[ok] fetched snapshot #122  rows=392  in 5.18s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #123  rows=392  in 6.33s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #124  rows=392  in 9.61s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #125  rows=392  in 6.60s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #126  rows=392  in 7.39s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #127  rows=392  in 6.67s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #128  rows=392  in 5.93s
+[ok] computed 9 dashboard(s) in 3.32s
+[ok] fetched snapshot #129  rows=392  in 5.89s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #130  rows=392  in 5.79s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #131  rows=392  in 5.63s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #132  rows=392  in 6.42s
+[ok] computed 9 dashboard(s) in 3.03s
+[ok] fetched snapshot #133  rows=392  in 7.44s
+[ok] computed 9 dashboard(s) in 3.34s
+[ok] fetched snapshot #134  rows=392  in 6.09s
+[ok] computed 9 dashboard(s) in 3.73s
+[ok] fetched snapshot #135  rows=392  in 6.30s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #136  rows=392  in 6.03s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #137  rows=392  in 6.10s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #138  rows=392  in 6.03s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #139  rows=392  in 5.27s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #140  rows=392  in 6.45s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #141  rows=392  in 5.62s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #142  rows=392  in 5.80s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #143  rows=392  in 5.60s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #144  rows=392  in 6.57s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #145  rows=392  in 5.96s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #146  rows=392  in 6.10s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #147  rows=392  in 6.03s
+[ok] computed 9 dashboard(s) in 3.29s
+[ok] fetched snapshot #148  rows=392  in 6.79s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #149  rows=392  in 6.66s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #150  rows=392  in 6.08s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #151  rows=392  in 7.77s
+[ok] computed 9 dashboard(s) in 6.27s
+[ok] fetched snapshot #152  rows=392  in 6.59s
+[ok] computed 9 dashboard(s) in 3.40s
+[ok] fetched snapshot #153  rows=392  in 5.56s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #154  rows=392  in 6.69s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #155  rows=392  in 6.69s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #156  rows=392  in 6.34s
+[ok] computed 9 dashboard(s) in 3.38s
+[ok] fetched snapshot #157  rows=392  in 6.16s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #158  rows=392  in 5.74s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #159  rows=392  in 6.33s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #160  rows=392  in 5.44s
+[ok] computed 9 dashboard(s) in 3.28s
+[ok] fetched snapshot #161  rows=392  in 5.70s
+[ok] computed 9 dashboard(s) in 3.13s
+[ok] fetched snapshot #162  rows=392  in 5.85s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #163  rows=392  in 6.11s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #164  rows=392  in 5.72s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #165  rows=392  in 6.18s
+[ok] computed 9 dashboard(s) in 3.00s
+[ok] fetched snapshot #166  rows=392  in 5.20s
+[ok] computed 9 dashboard(s) in 3.15s
+[ok] fetched snapshot #167  rows=392  in 6.31s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #168  rows=392  in 5.94s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #169  rows=392  in 5.33s
+[ok] computed 9 dashboard(s) in 3.30s
+[ok] fetched snapshot #170  rows=392  in 5.63s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #171  rows=392  in 5.38s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #172  rows=392  in 6.73s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #173  rows=392  in 5.96s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #174  rows=392  in 5.70s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #175  rows=392  in 4.16s
+[ok] computed 9 dashboard(s) in 3.28s
+[ok] fetched snapshot #176  rows=392  in 4.45s
+[ok] computed 9 dashboard(s) in 3.11s
+[ok] fetched snapshot #178  rows=392  in 4.33s
+[ok] computed 9 dashboard(s) in 3.80s
+[ok] fetched snapshot #181  rows=392  in 4.05s
+[ok] computed 9 dashboard(s) in 3.15s
+[ok] fetched snapshot #182  rows=392  in 4.01s
+[ok] computed 9 dashboard(s) in 3.29s
+[ok] fetched snapshot #183  rows=392  in 4.33s
+[ok] computed 9 dashboard(s) in 3.51s
+[ok] fetched snapshot #184  rows=392  in 4.23s
+[ok] computed 9 dashboard(s) in 3.48s
+[ok] fetched snapshot #185  rows=392  in 4.18s
+[ok] computed 9 dashboard(s) in 3.39s
+[ok] fetched snapshot #186  rows=392  in 4.08s
+[ok] computed 9 dashboard(s) in 3.59s
+[ok] fetched snapshot #187  rows=392  in 4.21s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #188  rows=392  in 4.50s
+[ok] computed 9 dashboard(s) in 4.44s
+[ok] fetched snapshot #189  rows=392  in 4.81s
+[ok] computed 9 dashboard(s) in 3.49s
+[ok] fetched snapshot #190  rows=392  in 4.66s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #191  rows=392  in 4.84s
+[ok] computed 9 dashboard(s) in 3.52s
+[ok] fetched snapshot #192  rows=392  in 4.28s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #193  rows=392  in 4.17s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #194  rows=392  in 4.30s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #195  rows=392  in 4.38s
+[ok] computed 9 dashboard(s) in 3.34s
+[ok] fetched snapshot #196  rows=392  in 4.47s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #197  rows=392  in 4.59s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #198  rows=392  in 4.57s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #199  rows=392  in 4.30s
+[ok] computed 9 dashboard(s) in 3.37s
+[ok] fetched snapshot #200  rows=392  in 4.41s
+[ok] computed 9 dashboard(s) in 3.32s
+[ok] fetched snapshot #201  rows=392  in 4.30s
+[ok] computed 9 dashboard(s) in 4.39s
+[ok] fetched snapshot #202  rows=392  in 4.54s
+[ok] computed 9 dashboard(s) in 3.10s
+[ok] fetched snapshot #203  rows=392  in 4.37s
+[ok] computed 9 dashboard(s) in 3.51s
+[ok] fetched snapshot #204  rows=392  in 4.56s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #205  rows=392  in 4.82s
+[ok] computed 9 dashboard(s) in 3.56s
+[ok] fetched snapshot #206  rows=392  in 5.06s
+[ok] computed 9 dashboard(s) in 3.36s
+[ok] fetched snapshot #207  rows=392  in 4.34s
+[ok] computed 9 dashboard(s) in 3.32s
+[ok] fetched snapshot #208  rows=392  in 4.79s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #209  rows=392  in 4.46s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #210  rows=392  in 4.15s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #211  rows=392  in 2.70s
+[ok] computed 9 dashboard(s) in 3.51s
+[ok] fetched snapshot #212  rows=392  in 5.19s
+[ok] computed 9 dashboard(s) in 4.82s
+[ok] fetched snapshot #213  rows=392  in 4.47s
+[ok] computed 9 dashboard(s) in 3.42s
+[ok] fetched snapshot #214  rows=392  in 4.94s
+[ok] computed 9 dashboard(s) in 4.13s
+[ok] fetched snapshot #215  rows=392  in 5.25s
+[ok] computed 9 dashboard(s) in 3.45s
+[ok] fetched snapshot #216  rows=392  in 5.13s
+[ok] computed 9 dashboard(s) in 3.49s
+[ok] fetched snapshot #217  rows=392  in 4.31s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #218  rows=392  in 4.67s
+[ok] computed 9 dashboard(s) in 3.44s
+[ok] fetched snapshot #219  rows=392  in 4.17s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #220  rows=392  in 4.54s
+[ok] computed 9 dashboard(s) in 3.30s
+[ok] fetched snapshot #221  rows=392  in 5.21s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #222  rows=392  in 6.25s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #223  rows=392  in 4.39s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #224  rows=392  in 5.25s
+[ok] computed 9 dashboard(s) in 3.30s
+[ok] fetched snapshot #225  rows=392  in 4.61s
+[ok] computed 9 dashboard(s) in 3.49s
+[ok] fetched snapshot #226  rows=392  in 4.47s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #227  rows=392  in 4.21s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #228  rows=392  in 4.18s
+[ok] computed 9 dashboard(s) in 3.28s
+[ok] fetched snapshot #229  rows=392  in 4.91s
+[ok] computed 9 dashboard(s) in 3.61s
+[ok] fetched snapshot #230  rows=392  in 4.36s
+[ok] computed 9 dashboard(s) in 3.34s
+[ok] fetched snapshot #231  rows=392  in 4.82s
+[ok] computed 9 dashboard(s) in 3.88s
+[ok] fetched snapshot #232  rows=392  in 4.25s
+[ok] computed 9 dashboard(s) in 3.56s
+[ok] fetched snapshot #233  rows=392  in 5.59s
+[ok] computed 9 dashboard(s) in 4.08s
+[ok] fetched snapshot #234  rows=392  in 4.48s
+[ok] computed 9 dashboard(s) in 3.32s
+[ok] fetched snapshot #235  rows=392  in 4.47s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #236  rows=392  in 5.04s
+[ok] computed 9 dashboard(s) in 3.58s
+[ok] fetched snapshot #237  rows=392  in 6.69s
+[ok] computed 9 dashboard(s) in 3.52s
+[ok] fetched snapshot #238  rows=392  in 4.05s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #239  rows=392  in 7.86s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #240  rows=392  in 4.37s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #241  rows=392  in 4.34s
+[ok] computed 9 dashboard(s) in 3.29s
+[ok] fetched snapshot #242  rows=392  in 4.15s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #243  rows=392  in 4.12s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #244  rows=392  in 4.12s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #245  rows=392  in 4.28s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #246  rows=392  in 4.00s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #247  rows=392  in 4.23s
+[ok] computed 9 dashboard(s) in 3.30s
+[ok] fetched snapshot #248  rows=392  in 4.57s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #249  rows=392  in 4.19s
+[ok] computed 9 dashboard(s) in 3.23s
+[ok] fetched snapshot #250  rows=392  in 4.35s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #251  rows=392  in 4.38s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #252  rows=392  in 4.30s
+[ok] computed 9 dashboard(s) in 3.31s
+[ok] fetched snapshot #253  rows=392  in 4.54s
+[ok] computed 9 dashboard(s) in 3.38s
+[ok] fetched snapshot #254  rows=392  in 4.39s
+[ok] computed 9 dashboard(s) in 3.34s
+[ok] fetched snapshot #255  rows=392  in 4.21s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #256  rows=392  in 4.37s
+[ok] computed 9 dashboard(s) in 3.91s
+[ok] fetched snapshot #257  rows=392  in 4.41s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #258  rows=392  in 4.24s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #259  rows=392  in 4.30s
+[ok] computed 9 dashboard(s) in 3.39s
+[ok] fetched snapshot #260  rows=392  in 4.17s
+[ok] computed 9 dashboard(s) in 3.29s
+[ok] fetched snapshot #261  rows=392  in 7.12s
+[ok] computed 9 dashboard(s) in 5.63s
+[ok] fetched snapshot #262  rows=392  in 4.38s
+[ok] computed 9 dashboard(s) in 3.45s
+[ok] fetched snapshot #263  rows=392  in 4.29s
+[ok] computed 9 dashboard(s) in 3.31s
+[ok] fetched snapshot #264  rows=392  in 5.27s
+[ok] computed 9 dashboard(s) in 3.47s
+[ok] fetched snapshot #265  rows=392  in 4.26s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #266  rows=392  in 4.34s
+[ok] computed 9 dashboard(s) in 3.39s
+[ok] fetched snapshot #267  rows=392  in 4.20s
+[ok] computed 9 dashboard(s) in 3.15s
+[ok] fetched snapshot #268  rows=392  in 4.71s
+[ok] computed 9 dashboard(s) in 3.58s
+[ok] fetched snapshot #269  rows=392  in 4.06s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #270  rows=392  in 4.17s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #271  rows=392  in 4.53s
+[ok] computed 9 dashboard(s) in 3.44s
+[ok] fetched snapshot #272  rows=392  in 4.42s
+[ok] computed 9 dashboard(s) in 3.41s
+[ok] fetched snapshot #273  rows=392  in 4.29s
+[ok] computed 9 dashboard(s) in 3.36s
+[ok] fetched snapshot #274  rows=392  in 4.39s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #275  rows=392  in 5.96s
+[ok] computed 9 dashboard(s) in 5.60s
+[ok] fetched snapshot #276  rows=392  in 4.38s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #277  rows=392  in 4.36s
+[ok] computed 9 dashboard(s) in 3.56s
+[ok] fetched snapshot #278  rows=392  in 4.32s
+[ok] computed 9 dashboard(s) in 3.15s
+[ok] fetched snapshot #279  rows=392  in 4.38s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #280  rows=392  in 4.22s
+[ok] computed 9 dashboard(s) in 3.23s
+[ok] fetched snapshot #281  rows=392  in 4.47s
+[ok] computed 9 dashboard(s) in 3.50s
+[ok] fetched snapshot #282  rows=392  in 5.96s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #283  rows=392  in 4.41s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #284  rows=392  in 4.25s
+[ok] computed 9 dashboard(s) in 3.28s
+[ok] fetched snapshot #285  rows=392  in 5.32s
+[ok] computed 9 dashboard(s) in 4.89s
+[ok] fetched snapshot #286  rows=392  in 4.46s
+[ok] computed 9 dashboard(s) in 3.23s
+[ok] fetched snapshot #287  rows=392  in 4.41s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #288  rows=392  in 4.37s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #289  rows=392  in 4.75s
+[ok] computed 9 dashboard(s) in 3.41s
+[ok] fetched snapshot #290  rows=392  in 4.24s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #291  rows=392  in 4.18s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #292  rows=392  in 4.40s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #293  rows=392  in 4.16s
+[ok] computed 9 dashboard(s) in 3.30s
+[ok] fetched snapshot #294  rows=392  in 4.42s
+[ok] computed 9 dashboard(s) in 3.23s
+[ok] fetched snapshot #295  rows=392  in 4.40s
+[ok] computed 9 dashboard(s) in 3.21s
+[ok] fetched snapshot #296  rows=392  in 5.17s
+[ok] computed 9 dashboard(s) in 3.70s
+[ok] fetched snapshot #297  rows=392  in 4.96s
+[ok] computed 9 dashboard(s) in 4.11s
+[ok] fetched snapshot #298  rows=392  in 4.23s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #299  rows=392  in 4.16s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #300  rows=392  in 10.49s
+[ok] computed 9 dashboard(s) in 7.16s
+[ok] fetched snapshot #301  rows=392  in 4.12s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #302  rows=392  in 4.09s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #303  rows=392  in 4.22s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #304  rows=392  in 4.22s
+[ok] computed 9 dashboard(s) in 3.11s
+[ok] fetched snapshot #305  rows=392  in 4.18s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #306  rows=392  in 4.01s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #307  rows=392  in 4.13s
+[ok] computed 9 dashboard(s) in 3.29s
+[ok] fetched snapshot #308  rows=392  in 4.22s
+[ok] computed 9 dashboard(s) in 3.25s
+[ok] fetched snapshot #309  rows=392  in 4.20s
+[ok] computed 9 dashboard(s) in 3.26s
+[ok] fetched snapshot #310  rows=392  in 4.20s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #311  rows=392  in 5.14s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #312  rows=392  in 4.24s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #313  rows=392  in 4.11s
+[ok] computed 9 dashboard(s) in 3.13s
+[ok] fetched snapshot #314  rows=392  in 5.22s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #315  rows=392  in 4.35s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #316  rows=392  in 4.16s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #317  rows=392  in 3.99s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #318  rows=392  in 5.09s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #319  rows=392  in 4.07s
+[ok] computed 9 dashboard(s) in 3.08s
+[ok] fetched snapshot #320  rows=392  in 3.90s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #321  rows=392  in 6.01s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #322  rows=392  in 4.09s
+[ok] computed 9 dashboard(s) in 3.54s
+[ok] fetched snapshot #323  rows=392  in 4.11s
+[ok] computed 9 dashboard(s) in 3.15s
+[ok] fetched snapshot #324  rows=392  in 4.15s
+[ok] computed 9 dashboard(s) in 3.12s
+[ok] fetched snapshot #325  rows=392  in 4.23s
+[ok] computed 9 dashboard(s) in 3.11s
+[ok] fetched snapshot #326  rows=392  in 4.07s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #327  rows=392  in 4.01s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #328  rows=392  in 4.11s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #329  rows=392  in 4.32s
+[ok] computed 9 dashboard(s) in 3.10s
+[ok] fetched snapshot #330  rows=392  in 4.22s
+[ok] computed 9 dashboard(s) in 3.61s
+[ok] fetched snapshot #331  rows=392  in 4.10s
+[ok] computed 9 dashboard(s) in 3.53s
+[ok] fetched snapshot #332  rows=392  in 4.10s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #333  rows=392  in 4.15s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #334  rows=392  in 4.11s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #335  rows=392  in 4.15s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #336  rows=392  in 4.08s
+[ok] computed 9 dashboard(s) in 3.13s
+[ok] fetched snapshot #337  rows=392  in 4.11s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #338  rows=392  in 4.13s
+[ok] computed 9 dashboard(s) in 3.13s
+[ok] fetched snapshot #339  rows=392  in 4.97s
+[ok] computed 9 dashboard(s) in 3.81s
+[ok] fetched snapshot #340  rows=392  in 4.24s
+[ok] computed 9 dashboard(s) in 3.47s
+[ok] fetched snapshot #341  rows=392  in 4.87s
+[ok] computed 9 dashboard(s) in 3.29s
+[ok] fetched snapshot #342  rows=392  in 4.82s
+[ok] computed 9 dashboard(s) in 3.11s
+[ok] fetched snapshot #343  rows=392  in 4.29s
+[ok] computed 9 dashboard(s) in 3.12s
+[ok] fetched snapshot #344  rows=392  in 4.30s
+[ok] computed 9 dashboard(s) in 3.11s
+[ok] fetched snapshot #345  rows=392  in 4.43s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #346  rows=392  in 4.42s
+[ok] computed 9 dashboard(s) in 3.87s
+[ok] fetched snapshot #347  rows=392  in 4.22s
+[ok] computed 9 dashboard(s) in 3.28s
+[ok] fetched snapshot #348  rows=392  in 4.16s
+[ok] computed 9 dashboard(s) in 3.60s
+[ok] fetched snapshot #349  rows=392  in 4.33s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #350  rows=392  in 6.08s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #351  rows=392  in 4.11s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #352  rows=392  in 11.24s
+[ok] computed 9 dashboard(s) in 6.83s
+[ok] fetched snapshot #353  rows=392  in 4.22s
+[ok] computed 9 dashboard(s) in 3.14s
+[ok] fetched snapshot #354  rows=392  in 4.75s
+[ok] computed 9 dashboard(s) in 3.36s
+[ok] fetched snapshot #355  rows=392  in 4.35s
+[ok] computed 9 dashboard(s) in 3.13s
+[ok] fetched snapshot #356  rows=392  in 6.34s
+[ok] computed 9 dashboard(s) in 3.23s
+[ok] fetched snapshot #357  rows=392  in 4.37s
+[ok] computed 9 dashboard(s) in 3.51s
+[ok] fetched snapshot #358  rows=392  in 4.22s
+[ok] computed 9 dashboard(s) in 4.05s
+[ok] fetched snapshot #359  rows=392  in 4.16s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #360  rows=392  in 4.38s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #361  rows=392  in 4.16s
+[ok] computed 9 dashboard(s) in 3.33s
+[ok] fetched snapshot #362  rows=392  in 4.16s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #363  rows=392  in 5.21s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #364  rows=392  in 4.43s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #365  rows=392  in 5.09s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #366  rows=392  in 4.37s
+[ok] computed 9 dashboard(s) in 3.40s
+[ok] fetched snapshot #367  rows=392  in 5.73s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #368  rows=392  in 4.39s
+[ok] computed 9 dashboard(s) in 3.16s
+[ok] fetched snapshot #369  rows=392  in 4.60s
+[ok] computed 9 dashboard(s) in 3.45s
+[ok] fetched snapshot #370  rows=392  in 4.76s
+[ok] computed 9 dashboard(s) in 3.34s
+[ok] fetched snapshot #371  rows=392  in 4.31s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #372  rows=392  in 11.66s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #373  rows=392  in 4.33s
+[ok] computed 9 dashboard(s) in 3.40s
+[ok] fetched snapshot #374  rows=392  in 4.19s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #375  rows=392  in 4.29s
+[ok] computed 9 dashboard(s) in 3.50s
+[ok] fetched snapshot #376  rows=392  in 4.27s
+[ok] computed 9 dashboard(s) in 3.52s
+[ok] fetched snapshot #377  rows=392  in 4.25s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #378  rows=392  in 6.14s
+[ok] computed 9 dashboard(s) in 4.82s
+[ok] fetched snapshot #379  rows=392  in 4.28s
+[ok] computed 9 dashboard(s) in 3.39s
+[ok] fetched snapshot #380  rows=392  in 5.27s
+[ok] computed 9 dashboard(s) in 6.95s
+[ok] fetched snapshot #381  rows=392  in 4.52s
+[ok] computed 9 dashboard(s) in 3.28s
+[ok] fetched snapshot #382  rows=392  in 4.48s
+[ok] computed 9 dashboard(s) in 3.44s
+[ok] fetched snapshot #383  rows=392  in 4.52s
+[ok] computed 9 dashboard(s) in 3.39s
+[ok] fetched snapshot #384  rows=392  in 4.14s
+[ok] computed 9 dashboard(s) in 3.20s
+[ok] fetched snapshot #385  rows=392  in 4.38s
+[ok] computed 9 dashboard(s) in 3.24s
+[ok] fetched snapshot #386  rows=392  in 4.28s
+[ok] computed 9 dashboard(s) in 3.22s
+[ok] fetched snapshot #387  rows=392  in 4.09s
+[ok] computed 9 dashboard(s) in 3.27s
+[ok] fetched snapshot #388  rows=392  in 4.08s
+[ok] computed 9 dashboard(s) in 3.19s
+[ok] fetched snapshot #389  rows=392  in 4.69s
+[ok] computed 9 dashboard(s) in 3.11s
+[ok] fetched snapshot #390  rows=392  in 4.24s
+[ok] computed 9 dashboard(s) in 3.17s
+[ok] fetched snapshot #391  rows=392  in 4.21s
+[ok] computed 9 dashboard(s) in 3.18s
+[ok] fetched snapshot #392  rows=392  in 4.61s
+[ok] computed 9 dashboard(s) in 4.46s
+[ok] fetched snapshot #393  rows=392  in 4.55s
+[ok] computed 9 dashboard(s) in 3.28s
+[ok] fetched snapshot #394  rows=392  in 4.82s
+[ok] computed 9 dashboard(s) in 3.43s

@@ -1,0 +1,95 @@
+================================================================================
+PO COLUMNS FOR THE `combined` TAB  —  paste-ready formulas
+================================================================================
+Target : the `combined` tab, 8 new columns AQ..AX (AP "Combined Grade" is the
+         last existing column, so nothing is overwritten).
+Source : the `po` tab, joined on Item Code with Item Name as fallback.
+Row    : every formula below is written for ROW 2, then filled down to row 499.
+
+Column letters used
+  combined!$C = Item Name        combined!$D = Item Code
+  po!$E  = Purchase Order No     po!$J  = Party Description
+  po!$AA = Item Code             po!$AF = Item Name
+  po!$AO = Item Required Date    (Excel serial number, not a date cell)
+  po!$CD = Next Transaction Qty          -> quantity RECEIVED
+  po!$CE = Next Transaction Pending Qty  -> quantity STILL PENDING
+
+Verified: po!CD + po!CE = Purchase Quantity, and Next Transaction Name = "GIN"
+on all 1,565 lines. So CE is genuinely the outstanding quantity.
+
+--------------------------------------------------------------------------------
+AQ1   header:  PO Match On
+--------------------------------------------------------------------------------
+AQ2:
+=IF(AND($D2<>"",$D2<>"0",LOWER($D2)<>"item code required",COUNTIF(po!$AA:$AA,$D2)>0),"Item Code",IF(AND($C2<>"",$C2<>"0",COUNTIF(po!$AF:$AF,$C2)>0),"Item Name",""))
+
+Item Code first; Item Name only if the code finds nothing. Blank = no PO match.
+
+--------------------------------------------------------------------------------
+AR1   header:  PO Pending Live
+--------------------------------------------------------------------------------
+AR2:
+=IF($AQ2="","",IF($AQ2="Item Code",SUMIFS(po!$CE:$CE,po!$AA:$AA,$D2,po!$AO:$AO,">="&TODAY()*1),SUMIFS(po!$CE:$CE,po!$AF:$AF,$C2,po!$AO:$AO,">="&TODAY()*1)))
+
+Pending quantity whose required date is TODAY OR LATER. This is the only
+quantity allowed to count as coverage.
+
+--------------------------------------------------------------------------------
+AS1   header:  PO Pending Overdue
+--------------------------------------------------------------------------------
+AS2:
+=IF($AQ2="","",IF($AQ2="Item Code",SUMIFS(po!$CE:$CE,po!$AA:$AA,$D2,po!$AO:$AO,"<"&TODAY()*1),SUMIFS(po!$CE:$CE,po!$AF:$AF,$C2,po!$AO:$AO,"<"&TODAY()*1)))
+
+Pending quantity already past its required date. Reported loudly, but it
+suppresses nothing -- per spec, an overdue PO is a chase item, not cover.
+
+--------------------------------------------------------------------------------
+AT1   header:  PO Received
+--------------------------------------------------------------------------------
+AT2:
+=IF($AQ2="","",IF($AQ2="Item Code",SUMIF(po!$AA:$AA,$D2,po!$CD:$CD),SUMIF(po!$AF:$AF,$C2,po!$CD:$CD)))
+
+--------------------------------------------------------------------------------
+AU1   header:  PO Earliest Due
+--------------------------------------------------------------------------------
+AU2:
+=IF($AQ2="","",LET(m,IF($AQ2="Item Code",MINIFS(po!$AO:$AO,po!$AA:$AA,$D2,po!$CE:$CE,">0",po!$AO:$AO,">="&TODAY()*1),MINIFS(po!$AO:$AO,po!$AF:$AF,$C2,po!$CE:$CE,">0",po!$AO:$AO,">="&TODAY()*1)),IF(m=0,"",TEXT(m,"yyyy-mm-dd"))))
+
+Earliest still-live promised date. Emitted as yyyy-mm-dd text on purpose, so the
+CSV the portal reads is unambiguous rather than a bare serial number.
+
+--------------------------------------------------------------------------------
+AV1   header:  PO Days Late
+--------------------------------------------------------------------------------
+AV2:
+=IF($AQ2="","",LET(m,IF($AQ2="Item Code",MINIFS(po!$AO:$AO,po!$AA:$AA,$D2,po!$CE:$CE,">0",po!$AO:$AO,"<"&TODAY()*1),MINIFS(po!$AO:$AO,po!$AF:$AF,$C2,po!$CE:$CE,">0",po!$AO:$AO,"<"&TODAY()*1)),IF(m=0,"",TODAY()*1-m)))
+
+Days late on the WORST overdue line for that item.
+
+--------------------------------------------------------------------------------
+AW1   header:  PO Numbers
+--------------------------------------------------------------------------------
+AW2:
+=IF($AQ2="","",IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(FILTER(po!$E$2:$E$2000,IF($AQ2="Item Code",po!$AA$2:$AA$2000=$D2,po!$AF$2:$AF$2000=$C2),po!$CE$2:$CE$2000>0))),""))
+
+--------------------------------------------------------------------------------
+AX1   header:  PO Vendors
+--------------------------------------------------------------------------------
+AX2:
+=IF($AQ2="","",IFERROR(TEXTJOIN(", ",TRUE,UNIQUE(FILTER(po!$J$2:$J$2000,IF($AQ2="Item Code",po!$AA$2:$AA$2000=$D2,po!$AF$2:$AF$2000=$C2),po!$CE$2:$CE$2000>0))),""))
+
+================================================================================
+VERIFICATION -- these three do NOT depend on today's date
+================================================================================
+1. AQ non-blank count must be 76
+      =COUNTIF(AQ2:AQ499,"Item Code")   -> 68
+      =COUNTIF(AQ2:AQ499,"Item Name")   -> 8
+2. AT (Received)   row 2 -> 2603      row 3 -> 74446
+3. AR+AS (live+overdue) row 2 -> 22397   row 3 -> 216554
+      the split between live and overdue shifts as dates pass, but the TOTAL
+      does not, which is why this is the reliable check.
+
+Date-dependent (correct as at 2026-08-24, will drift as dates pass):
+      row 2: live 15000 / overdue 7397 / earliest due 2026-09-02 / 52 days late
+      row 3: live 116000 / overdue 100554 / earliest due 2026-09-16 / 101 late
+================================================================================

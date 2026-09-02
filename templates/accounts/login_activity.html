@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Login Activity{% endblock %}
+{% block page_title %}Login Activity{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">Dashboard <span class="accent">/</span> Administration <span class="accent">/</span> Login Activity</div>
+<div class="toolbar">
+  <div class="page-header" style="margin-bottom:0;">
+    <h2>Who's signing in</h2>
+    <p class="tagline">Every login and logout across the JCPL workspace, newest first.</p>
+  </div>
+  <form method="get">
+    <select name="user" class="field-input" style="min-width:180px;" onchange="this.form.submit()">
+      <option value="">All users</option>
+      {% for account in team %}
+      <option value="{{ account.username }}" {% if account.username == selected_username %}selected{% endif %}>{{ account.username }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="panel">
+  <div class="table-scroll">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Role</th>
+        <th>Event</th>
+        <th>Date &amp; time</th>
+        <th>IP address</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in page_obj %}
+      <tr>
+        <td>
+          <strong>{{ event.user.username }}</strong>
+          {% if event.user.get_full_name %}<br><span style="color:var(--muted); font-size:12.5px;">{{ event.user.get_full_name }}</span>{% endif %}
+        </td>
+        <td>{{ event.user.get_role_display }}</td>
+        <td>
+          <span class="status-pill {% if event.event_type == 'login' %}event-login{% else %}event-logout{% endif %}">
+            {{ event.get_event_type_display }}
+          </span>
+        </td>
+        <td>{{ event.timestamp|date:"d M Y, H:i" }}</td>
+        <td>{{ event.ip_address|default:"—" }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" style="text-align:center; padding:40px 16px; color:var(--muted);">
+          {% if selected_username %}No login activity recorded for “{{ selected_username }}” yet.{% else %}No login activity recorded yet.{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div class="pagination-bar">
+    <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    <div class="links">
+      {% if page_obj.has_previous %}
+      <a class="btn btn-ghost btn-sm" href="?page={{ page_obj.previous_page_number }}{% if selected_username %}&user={{ selected_username }}{% endif %}">← Previous</a>
+      {% endif %}
+      {% if page_obj.has_next %}
+      <a class="btn btn-ghost btn-sm" href="?page={{ page_obj.next_page_number }}{% if selected_username %}&user={{ selected_username }}{% endif %}">Next →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

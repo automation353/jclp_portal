@@ -1,0 +1,11 @@
+[Unit]
+Description=JCPL — Daily MTO/MTS lock sweep at 00:05 UTC (5th-midnight cycle)
+
+[Timer]
+# Runs once a day just after midnight UTC. On the 6th of each month this
+# will find uploads whose lock_at is 06 T 00:00 and flip them to LOCKED.
+OnCalendar=*-*-* 00:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

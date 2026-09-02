@@ -1,0 +1,10 @@
+[Unit]
+Description=JCPL — Pull the po tab for Control 5
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/jclp_automation_portal/jcpl
+ExecStart=/root/jclp_automation_portal/jcpl/.venv/bin/python manage.py fetch_po_tab
+StandardOutput=append:/root/jclp_automation_portal/jcpl/logs/po_fetch.log
+StandardError=append:/root/jclp_automation_portal/jcpl/logs/po_fetch.log

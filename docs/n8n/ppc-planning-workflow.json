@@ -1,0 +1,132 @@
+{
+  "name": "PPC Planning Upload -> Google Sheet (3 tabs)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ppc-planning",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "responseData": "={{ { \"status\": \"accepted\", \"message\": \"Upload received. CP Req, RM Req and Quantity Sheet are refreshing in the background.\" } }}",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "wh-ppc-planning",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 800],
+      "webhookId": "ppc-planning"
+    },
+
+    { "parameters": {
+        "resource": "sheet", "operation": "clear",
+        "documentId": { "__rl": true, "value": "1jg4EFvWaRjwJ4l8tt0FqBM0Fy3sHT-0y6LrWhYizMQ0", "mode": "id" },
+        "sheetName":  { "__rl": true, "value": "CP Req", "mode": "name" }
+      },
+      "id": "clear-cp", "name": "Clear CP Req tab",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.7,
+      "position": [520, 400]
+    },
+    { "parameters": {
+        "jsCode": "// Read the webhook's JSON body. n8n stores POST-JSON bodies under\n// $json.body on some versions and at the root on others — handle both.\nconst wh = $('Webhook').first().json;\nconst body = wh.body || wh;\nconst rows = (body.cp_req && body.cp_req.rows) || [];\nif (!rows.length) throw new Error('cp_req is missing or has zero rows in the incoming payload.');\nreturn rows.map(r => ({ json: r }));"
+      },
+      "id": "expand-cp", "name": "Emit CP Req rows",
+      "type": "n8n-nodes-base.code", "typeVersion": 2,
+      "position": [820, 400]
+    },
+    { "parameters": {
+        "resource": "sheet", "operation": "append",
+        "documentId": { "__rl": true, "value": "1jg4EFvWaRjwJ4l8tt0FqBM0Fy3sHT-0y6LrWhYizMQ0", "mode": "id" },
+        "sheetName":  { "__rl": true, "value": "CP Req", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [], "schema": [], "attemptToConvertTypes": false, "convertFieldsToString": false },
+        "options": { "useAppend": true }
+      },
+      "id": "append-cp", "name": "Append CP Req",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.7,
+      "position": [1120, 400]
+    },
+
+    { "parameters": {
+        "resource": "sheet", "operation": "clear",
+        "documentId": { "__rl": true, "value": "1jg4EFvWaRjwJ4l8tt0FqBM0Fy3sHT-0y6LrWhYizMQ0", "mode": "id" },
+        "sheetName":  { "__rl": true, "value": "RM Req", "mode": "name" }
+      },
+      "id": "clear-rm", "name": "Clear RM Req tab",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.7,
+      "position": [520, 800]
+    },
+    { "parameters": {
+        "jsCode": "const wh = $('Webhook').first().json;\nconst body = wh.body || wh;\nconst rows = (body.rm_req && body.rm_req.rows) || [];\nif (!rows.length) throw new Error('rm_req is missing or has zero rows in the incoming payload.');\nreturn rows.map(r => ({ json: r }));"
+      },
+      "id": "expand-rm", "name": "Emit RM Req rows",
+      "type": "n8n-nodes-base.code", "typeVersion": 2,
+      "position": [820, 800]
+    },
+    { "parameters": {
+        "resource": "sheet", "operation": "append",
+        "documentId": { "__rl": true, "value": "1jg4EFvWaRjwJ4l8tt0FqBM0Fy3sHT-0y6LrWhYizMQ0", "mode": "id" },
+        "sheetName":  { "__rl": true, "value": "RM Req", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [], "schema": [], "attemptToConvertTypes": false, "convertFieldsToString": false },
+        "options": { "useAppend": true }
+      },
+      "id": "append-rm", "name": "Append RM Req",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.7,
+      "position": [1120, 800]
+    },
+
+    { "parameters": {
+        "resource": "sheet", "operation": "clear",
+        "documentId": { "__rl": true, "value": "1jg4EFvWaRjwJ4l8tt0FqBM0Fy3sHT-0y6LrWhYizMQ0", "mode": "id" },
+        "sheetName":  { "__rl": true, "value": "Quantity Sheet", "mode": "name" }
+      },
+      "id": "clear-qs", "name": "Clear Quantity Sheet tab",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.7,
+      "position": [520, 1200]
+    },
+    { "parameters": {
+        "jsCode": "const wh = $('Webhook').first().json;\nconst body = wh.body || wh;\nconst rows = (body.quantity_sheet && body.quantity_sheet.rows) || [];\nif (!rows.length) throw new Error('quantity_sheet is missing or has zero rows in the incoming payload.');\nreturn rows.map(r => ({ json: r }));"
+      },
+      "id": "expand-qs", "name": "Emit Quantity Sheet rows",
+      "type": "n8n-nodes-base.code", "typeVersion": 2,
+      "position": [820, 1200]
+    },
+    { "parameters": {
+        "resource": "sheet", "operation": "append",
+        "documentId": { "__rl": true, "value": "1jg4EFvWaRjwJ4l8tt0FqBM0Fy3sHT-0y6LrWhYizMQ0", "mode": "id" },
+        "sheetName":  { "__rl": true, "value": "Quantity Sheet", "mode": "name" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {}, "matchingColumns": [], "schema": [], "attemptToConvertTypes": false, "convertFieldsToString": false },
+        "options": { "useAppend": true }
+      },
+      "id": "append-qs", "name": "Append Quantity Sheet",
+      "type": "n8n-nodes-base.googleSheets", "typeVersion": 4.7,
+      "position": [1120, 1200]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[
+        { "node": "Clear CP Req tab",         "type": "main", "index": 0 },
+        { "node": "Clear RM Req tab",         "type": "main", "index": 0 },
+        { "node": "Clear Quantity Sheet tab", "type": "main", "index": 0 }
+      ]]
+    },
+
+    "Clear CP Req tab":         { "main": [[{ "node": "Emit CP Req rows",         "type": "main", "index": 0 }]] },
+    "Emit CP Req rows":         { "main": [[{ "node": "Append CP Req",            "type": "main", "index": 0 }]] },
+
+    "Clear RM Req tab":         { "main": [[{ "node": "Emit RM Req rows",         "type": "main", "index": 0 }]] },
+    "Emit RM Req rows":         { "main": [[{ "node": "Append RM Req",            "type": "main", "index": 0 }]] },
+
+    "Clear Quantity Sheet tab": { "main": [[{ "node": "Emit Quantity Sheet rows", "type": "main", "index": 0 }]] },
+    "Emit Quantity Sheet rows": { "main": [[{ "node": "Append Quantity Sheet",    "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "tags": [],
+  "active": false
+}

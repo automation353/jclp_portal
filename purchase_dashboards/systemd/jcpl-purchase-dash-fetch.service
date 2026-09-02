@@ -1,0 +1,10 @@
+[Unit]
+Description=JCPL — Pull the Purchase Combined tab and recompute dashboards
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/jclp_automation_portal/jcpl
+ExecStart=/root/jclp_automation_portal/jcpl/.venv/bin/python manage.py fetch_combined_sheet
+StandardOutput=append:/root/jclp_automation_portal/jcpl/logs/purchase_dash_fetch.log
+StandardError=append:/root/jclp_automation_portal/jcpl/logs/purchase_dash_fetch.log

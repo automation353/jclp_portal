@@ -1,0 +1,437 @@
+{
+  "name": "Stock Valuation — Drive -> Google Sheet (Daily 8am IST)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Daily 8am IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "13Tl4zDtMKzaOko5PCU6cgsK_Ao6KeTlb",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "List Files In Drive Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        640,
+        800
+      ],
+      "notesInFlow": true,
+      "notes": "Verify after import: this must list the files inside https://drive.google.com/drive/folders/13Tl4zDtMKzaOko5PCU6cgsK_Ao6KeTlb only, not the whole Drive. Attach the Google Drive OAuth2 credential after import — none is pre-wired."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pick the single newest file in the folder by modifiedTime, and\n// decide whether it's one we've already processed. Uses n8n's workflow\n// static data as the idempotency store — brief §Non-negotiables:\n// \"Re-running the same file must overwrite the same rows, never append\n// duplicates.\"\nconst items = $input.all();\n\nif (!items.length) {\n  throw new Error('No files found in the Stock Valuation Drive folder. Nothing to process.');\n}\n\nconst withTime = items\n  .map((it) => it.json)\n  .filter((f) => f && f.id && f.modifiedTime)\n  .sort((a, b) => new Date(b.modifiedTime) - new Date(a.modifiedTime));\n\nif (!withTime.length) {\n  throw new Error('Files were found but none carried an id + modifiedTime — check the Drive node output shape.');\n}\n\nconst newest = withTime[0];\nconst store = $getWorkflowStaticData('node');\nconst lastId = store.lastFileId || null;\nconst lastModified = store.lastModifiedTime || null;\n\nconst isNew = newest.id !== lastId || newest.modifiedTime !== lastModified;\n\nreturn [\n  {\n    json: {\n      fileId: newest.id,\n      fileName: newest.name,\n      modifiedTime: newest.modifiedTime,\n      isNew,\n      lastFileIdSeen: lastId,\n    },\n  },\n];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Pick Newest & Check Idempotency",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "b1000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.isNew }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Is This A New File?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## No new file today\nThe newest file in the Drive folder is the same one already processed on the last run (same Drive file id + modifiedTime). Stopping here on purpose — brief §Stage 2: a run that quietly reuses yesterday's file is worse than one that is down. This is NOT an error; it means TCS iON hasn't dropped a fresh export yet today.",
+        "height": 220,
+        "width": 320
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "No New File — Stop (Note)",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Download File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1360,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "data",
+        "options": {
+          "headerRow": true,
+          "includeEmptyCells": false
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Extract From File",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        720
+      ],
+      "notes": "Native binary xlsx extraction — the same node type dpr-workflow.json already uses. NOT a Code-node xlsx import: n8n Cloud's Code sandbox disallows require('xlsx'), which this deliberately avoids."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate before anything is written anywhere — brief §Stage 4:\n// \"Any failure returns a rejection reason and the run stops. Never\n// process a malformed file partially.\"\nconst rows = $input.all().map((it) => it.json);\n\nif (rows.length < 50) {\n  throw new Error(`Stock Valuation file has only ${rows.length} data rows — expected several hundred. Refusing to process what looks like a partial or wrong file.`);\n}\n\nconst REQUIRED_HEADERS = ['Item Code', 'Item Name', 'Closing Qty Base UOM', 'Closing Cost Amount'];\nconst sampleKeys = Object.keys(rows[0] || {}).map((k) => String(k).trim());\nconst missing = REQUIRED_HEADERS.filter((h) => !sampleKeys.includes(h));\n\nif (missing.length) {\n  throw new Error(`Stock Valuation file is missing expected column(s): ${missing.join(', ')}. Header signature has changed — stopping rather than writing a mismatched file.`);\n}\n\nreturn $input.all();"
+      },
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "name": "Validate Header Signature & Row Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nconst cleanedRows = [];\n\nfor (const item of rows) {\n  const row = item.json || {};\n\n  const hasAnyValue = Object.values(row).some(value => {\n    if (value === null || value === undefined) return false;\n    return String(value).trim() !== '';\n  });\n\n  if (!hasAnyValue) continue;\n\n  const cleanedRow = {};\n\n  for (const [key, value] of Object.entries(row)) {\n    const cleanKey = String(key || '')\n      .replace(/\\r/g, ' ')\n      .replace(/\\n/g, ' ')\n      .replace(/\\s+/g, ' ')\n      .trim();\n\n    if (!cleanKey) continue;\n    cleanedRow[cleanKey] = value;\n  }\n\n  cleanedRows.push(cleanedRow);\n}\n\nif (cleanedRows.length === 0) {\n  throw new Error('No usable data rows were extracted from the Stock Valuation file.');\n}\n\nreturn [\n  {\n    json: {\n      rowCount: cleanedRows.length,\n      rows: cleanedRows\n    }\n  }\n];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "name": "Bundle Rows (collapse to 1 item)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        720
+      ],
+      "notes": "Same cleaning logic as dpr-workflow.json's node of the same name — copied verbatim on purpose, not reinvented."
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1euJuqvIv7wHvwPejgCMOztJNGwU0eyTvPUioYLZZ4fg",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "stock_valuation",
+          "mode": "name"
+        }
+      },
+      "id": "a1000000-0000-4000-8000-00000000000a",
+      "name": "Clear Old Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2320,
+        720
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2 API"
+        }
+      },
+      "notes": "Same documentId + sheetName as dpr-workflow.json's node of the same name, copied byte-for-byte — this MUST land on the identical stock_valuation tab, not a lookalike."
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Bundle Rows (collapse to 1 item)').first().json;\nconst rows = source.rows || [];\n\nif (!Array.isArray(rows) || rows.length === 0) {\n  throw new Error('No bundled rows available for append.');\n}\n\nreturn rows.map(row => ({ json: row }));"
+      },
+      "id": "a1000000-0000-4000-8000-00000000000b",
+      "name": "Expand Rows For Append",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1euJuqvIv7wHvwPejgCMOztJNGwU0eyTvPUioYLZZ4fg",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "stock_valuation",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "useAppend": true
+        }
+      },
+      "id": "a1000000-0000-4000-8000-00000000000c",
+      "name": "Write Fresh Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2800,
+        720
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cTdqRAEN5iDJTYQk",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true
+            }
+          }
+        }
+      },
+      "id": "a1000000-0000-4000-8000-00000000000d",
+      "name": "Sync stock_valuation_columns via Apps Script",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3040,
+        720
+      ],
+      "executeOnce": true,
+      "notes": "Paste the SAME Apps Script Web App URL already live in dpr-workflow.json's node of this name — do not deploy a second Web App. This call is additive; it does not modify that script."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Commit the idempotency marker only now that the whole pipeline has\n// succeeded — clear, write and the Apps Script sync all completed without\n// throwing. Brief §Non-negotiables: \"Idempotent runs... re-running the\n// same file must overwrite the same rows, never append duplicates.\"\nconst picked = $('Pick Newest & Check Idempotency').first().json;\nconst store = $getWorkflowStaticData('node');\nstore.lastFileId = picked.fileId;\nstore.lastModifiedTime = picked.modifiedTime;\nstore.lastRunAt = new Date().toISOString();\n\nreturn [{ json: { committed: true, fileId: picked.fileId, fileName: picked.fileName } }];"
+      },
+      "id": "a1000000-0000-4000-8000-00000000000e",
+      "name": "Commit Idempotency Marker",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3280,
+        720
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 8am IST": {
+      "main": [
+        [
+          {
+            "node": "List Files In Drive Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Files In Drive Folder": {
+      "main": [
+        [
+          {
+            "node": "Pick Newest & Check Idempotency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Newest & Check Idempotency": {
+      "main": [
+        [
+          {
+            "node": "Is This A New File?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is This A New File?": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Extract From File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract From File": {
+      "main": [
+        [
+          {
+            "node": "Validate Header Signature & Row Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Header Signature & Row Count": {
+      "main": [
+        [
+          {
+            "node": "Bundle Rows (collapse to 1 item)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bundle Rows (collapse to 1 item)": {
+      "main": [
+        [
+          {
+            "node": "Clear Old Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Old Data": {
+      "main": [
+        [
+          {
+            "node": "Expand Rows For Append",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Rows For Append": {
+      "main": [
+        [
+          {
+            "node": "Write Fresh Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Fresh Data": {
+      "main": [
+        [
+          {
+            "node": "Sync stock_valuation_columns via Apps Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync stock_valuation_columns via Apps Script": {
+      "main": [
+        [
+          {
+            "node": "Commit Idempotency Marker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  }
+}

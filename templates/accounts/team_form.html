@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block page_title %}{{ heading }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">Dashboard <span class="accent">/</span> Administration <span class="accent">/</span> <a href="{% url 'team_list' %}">Team Accounts</a> <span class="accent">/</span> {{ heading }}</div>
+
+<div class="panel" style="padding:28px;">
+  <form method="post" class="form-grid">
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="form-row">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {% if field.name == 'password' %}
+      <div class="password-field-wrap">
+        {{ field }}
+        <button type="button" class="password-toggle" data-show-label="Show" data-hide-label="Hide" onclick="jcplTogglePassword(this)">Show</button>
+      </div>
+      {% else %}
+      {{ field }}
+      {% endif %}
+      {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+      {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+    {% endfor %}
+    <div>
+      <button type="submit" class="btn btn-accent">Save account</button>
+      <a href="{% url 'team_list' %}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  // Passwords are stored as one-way hashes — there's nothing to reveal for
+  // an *existing* password. This toggle only lets you check what you just
+  // typed into the field before saving.
+  function jcplTogglePassword(button) {
+    const input = button.previousElementSibling;
+    if (!input) return;
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    button.textContent = isHidden ? button.dataset.hideLabel : button.dataset.showLabel;
+  }
+</script>
+{% endblock %}

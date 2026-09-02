@@ -1,0 +1,109 @@
+{% load static dashboard_extras %}
+{# DEV NOTE: style.css is cache-busted with a per-request timestamp below.   #}
+{# Django's runserver sends no Cache-Control header on static files, so     #}
+{# browsers cache them heuristically and can serve a stale copy for a long  #}
+{# time after an edit — this forces a fresh fetch every load while the app  #}
+{# is under active development. Swap for a proper hashed ManifestStatic-    #}
+{# FilesStorage (via collectstatic) before deploying to production.         #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}JCPL Workspace{% endblock %} — Jolly Clamps Pvt. Ltd.</title>
+<link rel="icon" href="{% static 'img/jolly-clamps-logo.png' %}">
+<link rel="stylesheet" href="{% static 'css/style.css' %}?v={% now 'U' %}">
+</head>
+<body>
+<div class="app-shell" id="appShell">
+  <div class="nav-scrim" onclick="document.getElementById('appShell').classList.remove('nav-open')"></div>
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-chip">
+        <img src="{% static 'img/jolly-clamps-logo.png' %}" alt="Jolly Clamps">
+      </div>
+      <div class="brand-sub">Workspace</div>
+    </div>
+    <hr class="clamp-rule">
+
+    <div class="nav-group-label">Departments</div>
+    <ul class="nav-list">
+      {% for m in modules %}
+      <li class="nav-item {% if request.resolver_match.url_name == 'module' and request.resolver_match.kwargs.slug == m.slug %}active{% endif %}">
+        <a href="{% url 'dashboard:module' m.slug %}">
+          <span class="nav-icon">{% module_icon m.icon %}</span>
+          {{ m.name }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+
+    {% if user.is_authenticated and user.is_super_admin %}
+    <div class="nav-group-label">Administration</div>
+    <ul class="nav-list">
+      <li class="nav-item {% if request.resolver_match.url_name == 'team_list' or request.resolver_match.url_name == 'team_create' or request.resolver_match.url_name == 'team_edit' %}active{% endif %}">
+        <a href="{% url 'team_list' %}">
+          <span class="nav-icon">{% module_icon 'team' %}</span>
+          Team Accounts
+        </a>
+      </li>
+      <li class="nav-item {% if request.resolver_match.url_name == 'login_activity' %}active{% endif %}">
+        <a href="{% url 'login_activity' %}">
+          <span class="nav-icon">{% module_icon 'activity' %}</span>
+          Login Activity
+        </a>
+      </li>
+    </ul>
+    {% endif %}
+
+    <div class="sidebar-footer">
+      <ul class="nav-list" style="padding:0;">
+        <li class="nav-item">
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="nav-button">
+              Sign out
+            </button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="topbar-title">
+        <button class="nav-toggle" onclick="document.getElementById('appShell').classList.toggle('nav-open')" aria-label="Toggle menu">☰</button>
+        <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+      </div>
+      <div class="user-menu">
+        {% if user.is_authenticated %}
+        <span class="role-badge {% if user.is_super_admin %}super{% endif %}">{{ user.get_role_display }}</span>
+        <div class="avatar">{{ user.username|slice:":1"|upper }}</div>
+        <div class="user-name">
+          {{ user.get_full_name|default:user.username }}
+          <small>{{ user.department|default:"—" }}</small>
+        </div>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="logout-link">Sign out</button>
+        </form>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="content">
+      {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+</body>
+</html>
