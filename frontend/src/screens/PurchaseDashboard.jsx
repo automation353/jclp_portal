@@ -615,6 +615,17 @@ const DASHBOARDS = [
     subtitle: 'The "0 to 15" band is deliberately split into "genuinely short" and "not measurable" so the board cannot be read wrongly. Zero-consumption lines land in the tightest band by arithmetic, not by shortage.',
     plainSubtitle: 'Materials grouped by how many days of stock they have left. The lowest group is deliberately split into genuinely short and cannot-be-judged, so the board cannot be read the wrong way round.',
     headline: (t) => t?.genuinely_short?.value,  },
+  {
+    key: 'd10', group: 'A', num: 10,
+    name: 'Delivery Pipeline',
+    short: 'Delivery Pipeline',
+    plainName: 'What Is On Order',
+    plainShort: 'On Order',
+    icon: '🚚',
+    audience: 'Buyer · Plant Head',
+    subtitle: 'Every material that already has a purchase order placed: which ones carry a delivery date, which are overdue, and which have no date at all. The undated group is the follow-up list.',
+    plainSubtitle: 'All materials that have already been ordered. Shows which deliveries have a date, which are late, and which have no date at all — those are the ones to chase with the vendor.',
+    headline: (t) => t?.on_order?.value,  },
 ]
 
 // The card each board opens on, so you always land on its most actionable
@@ -629,6 +640,7 @@ const PRIMARY_TILE = {
   d5: 'dead_holding_stock',
   d6: 'mts_no_buffer',
   d7: 'not_measurable',
+  d10: 'undated',
 }
 
 // Display order is A → B → C → D → E. (The brief's *build* order put C first

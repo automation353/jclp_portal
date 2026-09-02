@@ -117,6 +117,7 @@ _SUMMABLE = {
     "excess_kg", "delta_kg", "lines", "green_level", "red_level",
     "yellow_level", "open_po", "net_order", "balance_to_raise",
     "po_live", "po_overdue",
+    "po_pending_live", "po_pending_overdue", "po_received",
 }
 
 

@@ -403,6 +403,34 @@ TILES = {
         ),
     },
 
+    # ─── Dashboard 10 — delivery pipeline (#13) ────────────────────────────
+    "d10": {
+        "on_order": (
+            "Material Already On Order",
+            "{value} materials have at least one purchase order on record.",
+        ),
+        "dated": (
+            "Delivery Date Known",
+            "{value} materials have a delivery date recorded against their PO. "
+            "These are the ones we can track.",
+        ),
+        "undated": (
+            "On Order — No Delivery Date",
+            "{value} materials have a purchase order but no due date recorded. "
+            "Follow up with the vendor to get a commitment.",
+        ),
+        "overdue": (
+            "Delivery Overdue",
+            "{value} materials have delivery that is past due. Either the vendor "
+            "is late or the date was never updated after partial receipt.",
+        ),
+        "no_po_needs_order": (
+            "Needs Order — No PO Yet",
+            "{value} materials need to be bought but nobody has placed a purchase "
+            "order for them yet.",
+        ),
+    },
+
     # ─── Control 1 — have we already ordered it ───────────────────────────
     "c1": {
         "feed_status": (
