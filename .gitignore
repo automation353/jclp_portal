@@ -7,4 +7,5 @@ staticfiles/
 node_modules/
 frontend/dist/
 *.egg-info/
-__pycache__/
+logs/
+uploads/

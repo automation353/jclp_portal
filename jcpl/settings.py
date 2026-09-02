@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'purchase_dashboards',
     'purchase_controls',
     'ppc_data',
+    'po_data',
     'sop',
 ]
 
