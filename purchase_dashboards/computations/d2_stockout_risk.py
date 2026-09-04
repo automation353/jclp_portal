@@ -25,6 +25,36 @@ GAP_COLS = [C_SR, C_TALLY, C_RM, C_SPEC, C_STOCK, C_DAILY, C_COVER, C_LEAD,
 def compute(rows):
     n = len(rows)
 
+    # ── #4: Already empty and in use ──────────────────────────────────────
+    # Stock is zero but the item has active daily consumption — production
+    # is already affected. Scans ALL rows, not just measurable ones,
+    # because even without a known lead time this is an emergency.
+    empty_in_use = []
+    for r in rows:
+        d = r["data"]
+        cs = num(d.get("current_stock_kg"))
+        dc = num(d.get("daily_consumption"))
+        if cs is not None and cs == 0 and dc is not None and dc > 0:
+            empty_in_use.append(r)
+
+    def empty_row(r):
+        d = r["data"]
+        return dict(
+            with_fields(r, "current_stock_kg", "daily_consumption",
+                        "current_stock_days", "lead_time_days",
+                        "to_be_ordered_qty", "rate"),
+            value=(num(d.get("to_be_ordered_qty")) or 0)
+                  * (num(d.get("rate")) or 0),
+        )
+
+    empty_in_use_rows = sorted(
+        [empty_row(r) for r in empty_in_use],
+        key=lambda x: x["daily_consumption"] or 0, reverse=True,
+    )
+    empty_daily_total = sum(
+        num(r["data"].get("daily_consumption")) or 0 for r in empty_in_use
+    )
+
     # The measurable population — both a lead time AND a consumption rate.
     measurable = []
     for r in rows:
@@ -55,6 +85,12 @@ def compute(rows):
                               key=lambda x: x["gap"], reverse=True)
 
     tiles = {
+        "already_empty_in_use": {
+            "label": "Already empty — still in use",
+            "value": len(empty_in_use),
+            "sub": f"Stock is zero but daily consumption is active  ·  {round(empty_daily_total, 1)} kg/day at risk",
+            "kind": "critical" if empty_in_use else "info",
+        },
         "cover_short": {
             "label": "Stock will finish before material comes",
             "value": len(cover_short),
@@ -83,6 +119,11 @@ def compute(rows):
     }
 
     tile_rows = {
+        "already_empty_in_use": block(
+            [C_SR, C_TALLY, C_RM, C_SPEC, C_CATEGORY, C_STOCK, C_DAILY,
+             C_COVER, C_LEAD, C_TOORDER, C_RATE, C_VALUE],
+            empty_in_use_rows,
+        ),
         "cover_short":      block(GAP_COLS, cover_short_rows),
         "severely_exposed": block(GAP_COLS, sorted([gap_row(m) for m in severe],
                                                    key=lambda x: x["gap"], reverse=True)),
