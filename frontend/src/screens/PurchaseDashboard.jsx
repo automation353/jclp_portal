@@ -626,6 +626,17 @@ const DASHBOARDS = [
     subtitle: 'Every material that already has a purchase order placed: which ones carry a delivery date, which are overdue, and which have no date at all. The undated group is the follow-up list.',
     plainSubtitle: 'All materials that have already been ordered. Shows which deliveries have a date, which are late, and which have no date at all — those are the ones to chase with the vendor.',
     headline: (t) => t?.on_order?.value,  },
+  {
+    key: 'd11', group: 'D', num: 11,
+    name: 'Vendor & PO Exposure',
+    short: 'Vendor Exposure',
+    plainName: 'How Much Do We Owe Vendors?',
+    plainShort: 'Vendor Exposure',
+    icon: '🏦',
+    audience: 'CFO · Accounts · Buyer',
+    subtitle: 'PO-based exposure per vendor — total pending, overdue delivery value, concentration risk, and recovery risk. Figures are exposure from the PO register; confirmed advance payments require Tally data (not yet connected).',
+    plainSubtitle: 'How much material is pending from each supplier, what is late, and where the biggest risk sits. These numbers come from purchase orders — actual payments will show once the accounts system is connected.',
+    headline: (t) => t?.total_exposure?.value,  },
 ]
 
 // The card each board opens on, so you always land on its most actionable
@@ -641,6 +652,7 @@ const PRIMARY_TILE = {
   d6: 'mts_no_buffer',
   d7: 'not_measurable',
   d10: 'undated',
+  d11: 'total_exposure',
 }
 
 // Display order is A → B → C → D → E. (The brief's *build* order put C first
@@ -659,10 +671,10 @@ const GROUPS = [
     note: 'MD · Audit · built first, everything rests on it',
     plainLabel: 'Can We Trust The Data?',
     plainNote: 'For the MD and audit · everything else rests on these two' },
-  { key: 'D', label: 'Group D — Source & awaiting data',
-    note: 'Raw sheet · Tally-blocked board',
-    plainLabel: 'Source Data',
-    plainNote: 'The raw sheet, and one board still waiting on data' },
+  { key: 'D', label: 'Group D — Vendor exposure & source data',
+    note: 'PO exposure · raw sheet · Tally-blocked board',
+    plainLabel: 'Vendor Exposure & Source Data',
+    plainNote: 'Vendor and PO exposure, the raw sheet, and one board still waiting on accounts data' },
   { key: 'E', label: 'Group E — The Seven Purchase Controls',
     note: 'Rajeev Joshi spec · verdicts, not tiles · 3, 4, 6, 7 buildable today',
     plainLabel: 'The Seven Purchase Checks',

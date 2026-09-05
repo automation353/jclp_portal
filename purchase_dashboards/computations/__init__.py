@@ -22,6 +22,7 @@ from . import (
     d8_data_trust,
     d9_signal_conflict,
     d10_delivery_pipeline,
+    d11_vendor_exposure,
 )
 
 log = logging.getLogger(__name__)
@@ -42,6 +43,8 @@ DASHBOARDS = {
     d7_coverage_ageing.DASHBOARD_KEY: d7_coverage_ageing,
     # Group A+ — build order 4 (delivery tracking, #13)
     d10_delivery_pipeline.DASHBOARD_KEY: d10_delivery_pipeline,
+    # Group D — build order 5 (vendor & PO exposure)
+    d11_vendor_exposure.DASHBOARD_KEY: d11_vendor_exposure,
 }
 
 
