@@ -101,7 +101,15 @@ def inv_fields(r):
 
 
 def block(columns, rows):
-    """One tile_rows entry, with auto-computed subtotals for numeric columns."""
+    """One tile_rows entry, with auto-computed subtotals for numeric columns.
+
+    Row numbers are re-assigned sequentially (1, 2, 3 …) so drill-down
+    tables read as a clean numbered list rather than carrying the original
+    sheet row numbers which are non-contiguous and confusing.  Rows are
+    shallow-copied so renumbering one block never leaks into another that
+    shares the same dict references.
+    """
+    rows = [{**r, "sr_no": i} for i, r in enumerate(rows, 1)]
     subtotals = _subtotals(columns, rows) if len(rows) > 1 else None
     entry = {"columns": columns, "rows": rows}
     if subtotals:

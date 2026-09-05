@@ -32,6 +32,7 @@ SUGGESTED = {
     "STOCK-OUT": "Emergency PO or substitute — check WIP first",
     "CRITICAL":  "Raise PO today; confirm lead time with vendor",
     "WATCH":     "Include in next weekly PO cycle",
+    "COVERED":   "PO already placed — track delivery, no new order needed",
 }
 
 QUEUE_COLS = [
@@ -57,16 +58,26 @@ def compute(rows):
 
     # --- action queue (the ITEMS NEEDING ORDER drill) -----------------------
     # #2: net off open POs — order = requirement - open_po (floor at 0)
+    # When net_order = 0 the open PO already covers the full requirement,
+    # so status becomes COVERED and the item moves out of the action queue
+    # into its own "covered_by_po" bucket.
     queue = []
+    covered = []
     for r in to_order:
         d = r["data"]
-        st = _status(d)
         ltd = num(d.get("lead_time_days")) or 0
         csd = num(d.get("current_stock_days")) or 0
         toq = num(d.get("to_be_ordered_qty")) or 0
         open_po = num(d.get("po_pending_live")) or 0
         net = max(0, toq - open_po)
-        queue.append(dict(
+
+        # If open PO fully covers the requirement, no new order needed
+        if net == 0 and open_po > 0:
+            st = "COVERED"
+        else:
+            st = _status(d)
+
+        row = dict(
             with_fields(r, "current_stock_kg", "daily_consumption",
                         "current_stock_days", "lead_time_days",
                         "to_be_ordered_qty", "rate"),
@@ -77,11 +88,17 @@ def compute(rows):
             status=st,
             suggested_action=SUGGESTED[st],
             owner="",
-        ))
+        )
+        if st == "COVERED":
+            covered.append(row)
+        else:
+            queue.append(row)
+
     queue.sort(key=lambda x: (x["current_stock_days"]
                               if x["current_stock_days"] is not None else 10**9))
+    covered.sort(key=lambda x: x.get("open_po") or 0, reverse=True)
 
-    # Headline values now use the net (after PO) amounts from the queue
+    # Headline values now use the net (after PO) amounts from the action queue
     order_value_all = sum(q["value"] for q in queue)
     order_value_coded = sum(q["value"] for q in queue
                             if is_present_code(q.get("rm_code")))
@@ -139,8 +156,11 @@ def compute(rows):
     tiles = {
         "items_needing_order": {
             "label": "Material to be purchased",
-            "value": len(to_order),
-            "sub": "Rows where To be ordered Qty > 0",
+            "value": len(queue),
+            "sub": (
+                f"{len(queue)} need a new PO  ·  "
+                f"{len(covered)} already covered by open PO"
+            ),
             "kind": "critical",
         },
         "order_value_at_stake": {
@@ -149,6 +169,12 @@ def compute(rows):
             "sub": f"including uncoded rows  ·  coded only: {rupees_in(order_value_coded)}  ·  Rate = avg from TCS iON stock statement",
             "kind": "warn",
             "indicative": True,
+        },
+        "covered_by_po": {
+            "label": "Already covered by open PO",
+            "value": len(covered),
+            "sub": "Requirement fully met by existing purchase order — no new PO needed, track delivery",
+            "kind": "score" if covered else "info",
         },
         "below_red_level": {
             "label": "Stock below safety level (red level)",
@@ -166,6 +192,7 @@ def compute(rows):
 
     tile_rows = {
         "items_needing_order": block(QUEUE_COLS, queue),
+        "covered_by_po": block(QUEUE_COLS, covered),
         "order_value_at_stake": block(
             add_inventory([C_TALLY, C_RM, C_SPEC, C_CATEGORY, C_TOORDER, C_RATE, C_VALUE]),
             sorted(queue, key=lambda x: x["value"], reverse=True),
