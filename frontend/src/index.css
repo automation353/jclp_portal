@@ -529,7 +529,7 @@ th.num .dash-th-label{text-align:right}
    Sits beside Refresh in the dashboard header. Purely a wording control —
    it never changes a number, so it is styled as a quiet segmented toggle
    rather than as a primary action. */
-.dash-head-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.page-head .dash-head-actions{display:flex;align-items:center;gap:10px;flex:0 0 auto}
 .dash-langswitch{display:inline-flex;border:1px solid #d3dde7;border-radius:8px;
   overflow:hidden;background:#f4f7fa}
 .dash-langswitch button{appearance:none;border:0;background:transparent;
