@@ -1,0 +1,2446 @@
+{
+  "name": "3 — TCS ION ERP Sheet Sync (17 Tabs + FG Stock Open + _LOAD_LOG)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tcs-ion-erp",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "wh-tcs-ion-",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        2000
+      ],
+      "webhookId": "tcs-ion-erp"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst tabName  = body.tab_name  || '';\nconst headers  = body.headers   || [];\nconst rows     = body.rows      || [];\nif (!tabName || !headers.length) {\n  throw new Error('Missing tab_name or headers (report_key=' + body.report_key + ')');\n}\nreturn [{ json: { tabName, rows, headers } }];\n"
+      },
+      "id": "prepare",
+      "name": "Prepare Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Item Master",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Item Master"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "BOM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "BOM"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "FG Stock",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "FG Stock"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "CP Stock",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "CP Stock"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "RM Stock",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "RM Stock"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "PM Stock",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "PM Stock"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Consumables",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Consumables"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Production FG",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Production FG"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Production Semi",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Production Semi"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Dispatch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Dispatch"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Forecast",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Forecast"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Sales Orders",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Sales Orders"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Pending PO",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Pending PO"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Pending PR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Pending PR"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Material Issue",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Material Issue"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "Item Cost",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Item Cost"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "FG Ageing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "FG Ageing"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "_LOAD_LOG",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "_LOAD_LOG"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "FG Stock Open",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "FG Stock Open"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-tab",
+      "name": "Switch by Tab",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        700,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Item Master"
+        }
+      },
+      "id": "clear-item-master",
+      "name": "Clear Item Master",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-item-master",
+      "name": "Split Item Master Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Item Master"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-item-master",
+      "name": "Write Item Master",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "BOM"
+        }
+      },
+      "id": "clear-bom",
+      "name": "Clear BOM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-bom",
+      "name": "Split BOM Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "BOM"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-bom",
+      "name": "Write BOM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "FG Stock"
+        }
+      },
+      "id": "clear-fg-stock",
+      "name": "Clear FG Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-fg-stock",
+      "name": "Split FG Stock Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "FG Stock"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-fg-stock",
+      "name": "Write FG Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "CP Stock"
+        }
+      },
+      "id": "clear-cp-stock",
+      "name": "Clear CP Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        750
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-cp-stock",
+      "name": "Split CP Stock Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "CP Stock"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-cp-stock",
+      "name": "Write CP Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        750
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "RM Stock"
+        }
+      },
+      "id": "clear-rm-stock",
+      "name": "Clear RM Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        1000
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-rm-stock",
+      "name": "Split RM Stock Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "RM Stock"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-rm-stock",
+      "name": "Write RM Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        1000
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "PM Stock"
+        }
+      },
+      "id": "clear-pm-stock",
+      "name": "Clear PM Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        1250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-pm-stock",
+      "name": "Split PM Stock Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        1250
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "PM Stock"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-pm-stock",
+      "name": "Write PM Stock",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        1250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Consumables"
+        }
+      },
+      "id": "clear-consumables",
+      "name": "Clear Consumables",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        1500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-consumables",
+      "name": "Split Consumables Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Consumables"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-consumables",
+      "name": "Write Consumables",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        1500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Production FG"
+        }
+      },
+      "id": "clear-production-fg",
+      "name": "Clear Production FG",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        1750
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-production-fg",
+      "name": "Split Production FG Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        1750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Production FG"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-production-fg",
+      "name": "Write Production FG",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        1750
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Production Semi"
+        }
+      },
+      "id": "clear-production-semi",
+      "name": "Clear Production Semi",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        2000
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-production-semi",
+      "name": "Split Production Semi Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Production Semi"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-production-semi",
+      "name": "Write Production Semi",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        2000
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Dispatch"
+        }
+      },
+      "id": "clear-dispatch",
+      "name": "Clear Dispatch",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        2250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-dispatch",
+      "name": "Split Dispatch Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        2250
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Dispatch"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-dispatch",
+      "name": "Write Dispatch",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        2250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Forecast"
+        }
+      },
+      "id": "clear-forecast",
+      "name": "Clear Forecast",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        2500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-forecast",
+      "name": "Split Forecast Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        2500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Forecast"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-forecast",
+      "name": "Write Forecast",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        2500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Sales Orders"
+        }
+      },
+      "id": "clear-sales-orders",
+      "name": "Clear Sales Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        2750
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-sales-orders",
+      "name": "Split Sales Orders Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        2750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Sales Orders"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-sales-orders",
+      "name": "Write Sales Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        2750
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Pending PO"
+        }
+      },
+      "id": "clear-pending-po",
+      "name": "Clear Pending PO",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        3000
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-pending-po",
+      "name": "Split Pending PO Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        3000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Pending PO"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-pending-po",
+      "name": "Write Pending PO",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        3000
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Pending PR"
+        }
+      },
+      "id": "clear-pending-pr",
+      "name": "Clear Pending PR",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        3250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-pending-pr",
+      "name": "Split Pending PR Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        3250
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Pending PR"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-pending-pr",
+      "name": "Write Pending PR",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        3250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Material Issue"
+        }
+      },
+      "id": "clear-material-issue",
+      "name": "Clear Material Issue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        3500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-material-issue",
+      "name": "Split Material Issue Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        3500
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Material Issue"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-material-issue",
+      "name": "Write Material Issue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        3500
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Item Cost"
+        }
+      },
+      "id": "clear-item-cost",
+      "name": "Clear Item Cost",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        3750
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-item-cost",
+      "name": "Split Item Cost Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        3750
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Item Cost"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-item-cost",
+      "name": "Write Item Cost",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        3750
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "FG Ageing"
+        }
+      },
+      "id": "clear-fg-ageing",
+      "name": "Clear FG Ageing",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        4000
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-fg-ageing",
+      "name": "Split FG Ageing Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1220,
+        4000
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "FG Ageing"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-fg-ageing",
+      "name": "Write FG Ageing",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1480,
+        4000
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Prepare Data').first().json;\nconst rows = data.rows || [];\nconst headers = data.headers || [];\nif (!rows.length) return [];\nreturn rows.map(row => {\n  const obj = {};\n  for (const h of headers) {\n    const val = row[h];\n    obj[h] = (val === null || val === undefined) ? '' : String(val);\n  }\n  return { json: obj };\n});\n"
+      },
+      "id": "split-load-log",
+      "name": "Split _LOAD_LOG Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        4250
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "PASTE_TCS_ION_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "_LOAD_LOG"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "write-load-log",
+      "name": "Write _LOAD_LOG",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1220,
+        4250
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PASTE_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "clear-fg-stock-open",
+      "name": "Clear FG Stock Open",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        5800
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 500,
+        "options": {}
+      },
+      "id": "split-fg-stock-open",
+      "name": "Split FG Stock Open",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1350,
+        5800
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "write-fg-stock-open",
+      "name": "Write FG Stock Open",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1600,
+        5800
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Data": {
+      "main": [
+        [
+          {
+            "node": "Switch by Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Item Master": {
+      "main": [
+        [
+          {
+            "node": "Split Item Master Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Item Master Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Item Master",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear BOM": {
+      "main": [
+        [
+          {
+            "node": "Split BOM Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split BOM Rows": {
+      "main": [
+        [
+          {
+            "node": "Write BOM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear FG Stock": {
+      "main": [
+        [
+          {
+            "node": "Split FG Stock Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split FG Stock Rows": {
+      "main": [
+        [
+          {
+            "node": "Write FG Stock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear CP Stock": {
+      "main": [
+        [
+          {
+            "node": "Split CP Stock Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split CP Stock Rows": {
+      "main": [
+        [
+          {
+            "node": "Write CP Stock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear RM Stock": {
+      "main": [
+        [
+          {
+            "node": "Split RM Stock Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split RM Stock Rows": {
+      "main": [
+        [
+          {
+            "node": "Write RM Stock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear PM Stock": {
+      "main": [
+        [
+          {
+            "node": "Split PM Stock Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split PM Stock Rows": {
+      "main": [
+        [
+          {
+            "node": "Write PM Stock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Consumables": {
+      "main": [
+        [
+          {
+            "node": "Split Consumables Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Consumables Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Consumables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Production FG": {
+      "main": [
+        [
+          {
+            "node": "Split Production FG Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Production FG Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Production FG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Production Semi": {
+      "main": [
+        [
+          {
+            "node": "Split Production Semi Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Production Semi Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Production Semi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Dispatch": {
+      "main": [
+        [
+          {
+            "node": "Split Dispatch Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Dispatch Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Forecast": {
+      "main": [
+        [
+          {
+            "node": "Split Forecast Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Forecast Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Forecast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Sales Orders": {
+      "main": [
+        [
+          {
+            "node": "Split Sales Orders Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Sales Orders Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Sales Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending PO": {
+      "main": [
+        [
+          {
+            "node": "Split Pending PO Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Pending PO Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Pending PO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Pending PR": {
+      "main": [
+        [
+          {
+            "node": "Split Pending PR Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Pending PR Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Pending PR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Material Issue": {
+      "main": [
+        [
+          {
+            "node": "Split Material Issue Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Material Issue Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Material Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Item Cost": {
+      "main": [
+        [
+          {
+            "node": "Split Item Cost Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Item Cost Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Item Cost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear FG Ageing": {
+      "main": [
+        [
+          {
+            "node": "Split FG Ageing Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split FG Ageing Rows": {
+      "main": [
+        [
+          {
+            "node": "Write FG Ageing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch by Tab": {
+      "main": [
+        [
+          {
+            "node": "Clear FG Stock Open",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear BOM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear FG Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear CP Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear RM Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear PM Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Consumables",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Production FG",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Production Semi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Forecast",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Sales Orders",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Pending PO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Pending PR",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Material Issue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear Item Cost",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear FG Ageing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split _LOAD_LOG Rows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear FG Stock Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split _LOAD_LOG Rows": {
+      "main": [
+        [
+          {
+            "node": "Write _LOAD_LOG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear FG Stock Open": {
+      "main": [
+        [
+          {
+            "node": "Split FG Stock Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split FG Stock Open": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Write FG Stock Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write FG Stock Open": {
+      "main": [
+        [
+          {
+            "node": "Split FG Stock Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "TCS ION"
+    },
+    {
+      "name": "ERP"
+    },
+    {
+      "name": "Sheet Sync"
+    }
+  ],
+  "meta": {
+    "instanceId": "jollyclamps"
+  },
+  "pinData": {},
+  "_comment": "POST /webhook/tcs-ion-erp — Switch routes to 18 tab flows (17 ERP tabs with Clear→Split→Write + 1 _LOAD_LOG with Split→Write append-only). Replace PASTE_TCS_ION_SHEET_ID and PASTE_CREDENTIAL_ID."
+}

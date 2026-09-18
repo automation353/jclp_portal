@@ -226,6 +226,7 @@ class PPCFeasibilityRun(models.Model):
         ("flagged", "Flagged — has unresolved issues"),
         ("approved", "Approved"),
         ("rejected", "Rejected"),
+        ("superseded", "Superseded by a later run"),
     ]
 
     plan_batch = models.ForeignKey(
@@ -269,6 +270,7 @@ class PPCCapacityFlag(models.Model):
         ("capacity", "Capacity overload"),
         ("machine", "Machine overload"),
         ("ebq", "Under-EBQ batch"),
+        ("manpower", "Manpower overload"),
     ]
 
     run = models.ForeignKey(
@@ -322,6 +324,10 @@ class PPCRelease(models.Model):
     plan_month = models.CharField(max_length=7)
     release_number = models.PositiveIntegerField(
         help_text="Sequential within a month (1, 2, 3…)",
+    )
+    lot_number = models.CharField(
+        max_length=20, blank=True,
+        help_text="Formal lot ID: JCPL-YYMM-NNN (e.g. JCPL-2609-001)",
     )
     feasibility_run = models.ForeignKey(
         PPCFeasibilityRun, on_delete=models.CASCADE,

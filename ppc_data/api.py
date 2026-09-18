@@ -30,6 +30,34 @@ log = logging.getLogger(__name__)
 
 UPLOAD_ROOT_DEFAULT = "/root/jclp_automation_portal/jcpl/uploads/ppc_data"
 
+# R3SS-essential table_keys — only these are accepted for upload.
+# Non-essential keys (route_master, capacity_ppp, erp_cp_stock, etc.)
+# are for L5-L8 phases and will be added when those phases are built.
+R3SS_ALLOWED_KEYS = frozenset({
+    # R3SS source files (monthly uploads)
+    "demand_freeze",        # August forecast 2026.xlsx → Initial demand
+    "mps_schedule_form",    # MpsSS.xlsm → W1-W5, Additional Demand
+    "fg_stock_statement",   # FG.xlsx (Stock Statement) → Opening Balance, FG
+    "dpr_production",       # DPR all Plant.xlsx → Pack (production qty)
+    "fg_dispatch",          # FG Issue qty .xlsx → Disp (dispatch qty)
+    "monitoring",           # Monitoring.xlsx → Green Level (per ERP) + EBQ (per family)
+    "batch_ebq",            # EBQ Qualification.xlsx → EBQ rounding
+    # Master tables (uploaded once, rarely changes)
+    "item_master",
+    "family_hierarchy",
+    "stock_policy",
+    "lead_time",
+    "part_engineering",
+    "bom_master",
+    # ERP reports (supplementary)
+    "erp_fg_stock",
+    "erp_sales_orders",
+    # Legacy MPS format
+    "mps_schedule",
+    # R3SS plan (for comparison upload)
+    "r3ss_plan",
+})
+
 
 def _upload_root():
     return os.environ.get("JCLP_PPC_DATA_UPLOAD_ROOT", UPLOAD_ROOT_DEFAULT)
@@ -63,9 +91,9 @@ def _detect_table_key(filename, sheet_names=None):
     # W1.11 — BOM_Item_Template.xlsx → bom_master
     if "bom" in fn and ("template" in fn or "item" in fn):
         return "bom_master"
-    # W1.2 — Monitoring.xlsx (Family Group sheet) → family_hierarchy
+    # Monitoring.xlsx → Green Level (per ERP) + EBQ (per family), raw passthrough
     if "monitoring" in fn:
-        return "family_hierarchy"
+        return "monitoring"
     # W1.4 — Process File.xlsx → route_master
     if "process" in fn and "file" in fn:
         return "route_master"
@@ -102,16 +130,27 @@ def _detect_table_key(filename, sheet_names=None):
     # L2 — Forecast / demand → demand_freeze (generic pattern, but not ERP exports)
     if "forecast" in fn and "erp" not in fn:
         return "demand_freeze"
-    # L3 — MpsSS.xlsm → mps_schedule
+    # L3 — MpsSS.xlsm → mps_schedule_form (Schedule Form with W1-W5 + Additional)
     if "mps" in fn and ("schedule" in fn or "ss" in fn):
-        return "mps_schedule"
+        return "mps_schedule_form"
     # L4 — R3 SS.xlsx / R3SS.xlsx → r3ss_plan
     if "r3" in fn and "ss" in fn:
         return "r3ss_plan"
     if "r3ss" in fn:
         return "r3ss_plan"
 
+    # ── R3SS source files ──
+    # DPR all Plant.xlsx → dpr_production (Pack)
+    if "dpr" in fn and "plant" in fn:
+        return "dpr_production"
+    # FG Issue qty .xlsx → fg_dispatch (Disp)
+    if "fg" in fn and "issue" in fn:
+        return "fg_dispatch"
+
     # ── L1 — ERP report auto-detect (manual upload) ──
+    # FG.xlsx (Stock Statement) → fg_stock_statement (before erp_fg_stock)
+    if fn in ("fg.xlsx",) or ("stock" in fn and "statement" in fn and "valuation" in fn):
+        return "fg_stock_statement"
     # Stock files
     if "fg" in fn and "stock" in fn:
         return "erp_fg_stock"
@@ -199,11 +238,12 @@ def upload(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if table_key not in PARSERS:
+    if table_key not in R3SS_ALLOWED_KEYS:
         return Response(
             {"detail": (
-                f"No parser registered for table_key='{table_key}'. "
-                f"Available: {', '.join(sorted(PARSERS.keys()))}"
+                f"Upload for table_key='{table_key}' is not enabled. "
+                f"Only R3SS-essential uploads are active: "
+                f"{', '.join(sorted(R3SS_ALLOWED_KEYS))}"
             )},
             status=status.HTTP_400_BAD_REQUEST,
         )
@@ -213,6 +253,40 @@ def upload(request):
         "" if request.data.get("notes") is None
         else str(request.data["notes"])
     )[:500]
+
+    # ── R3SS source files: raw passthrough to n8n (no Django storage) ──
+    from .sheet_sync import _RAW_SHEET_CONFIG
+    if table_key in _RAW_SHEET_CONFIG:
+        from .sheet_sync import sync_raw_to_sheet
+
+        sync_result = None
+        try:
+            sync_result = sync_raw_to_sheet(
+                stored_path, table_key, original_name,
+                uploader=str(request.user),
+            )
+            log.info("Raw passthrough for %s: %s", table_key, sync_result)
+        except Exception as exc:
+            log.exception("Raw passthrough failed for %s", table_key)
+            sync_result = {"ok": False, "error": str(exc)}
+
+        return Response({
+            "table_key": table_key,
+            "original_filename": original_name,
+            "row_count": sync_result.get("total_rows", 0),
+            "sheet_sync": sync_result,
+        }, status=status.HTTP_201_CREATED)
+
+    # ── All other files: parse → store → sync (existing flow) ──
+
+    if table_key not in PARSERS:
+        return Response(
+            {"detail": (
+                f"No parser registered for table_key='{table_key}'. "
+                f"Available: {', '.join(sorted(PARSERS.keys()))}"
+            )},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # Determine file_type and level
     is_erp = table_key.startswith("erp_")
@@ -225,7 +299,6 @@ def upload(request):
         parsed_rows = parser_mod.parse(stored_path)
     except Exception as exc:
         log.exception("PPC parse failed for %s (table_key=%s)", stored_path, table_key)
-        # Create a batch record with the error
         batch = PPCUploadBatch.objects.create(
             uploader=request.user,
             source_file=stored_path,
@@ -283,7 +356,15 @@ def upload(request):
         f"for table '{table_key}': {len(parsed_rows)} rows parsed and stored.",
     )
 
-    # Fire-and-forget sheet sync — every upload goes to a Google Sheet
+    # G9: auto-freeze FG stock as FG_STOCK_OPEN on first upload of the month
+    if table_key == "erp_fg_stock":
+        try:
+            _maybe_freeze_fg_stock_open(batch, parsed_rows)
+        except Exception:
+            log.exception("FG_STOCK_OPEN auto-freeze failed (non-blocking)")
+
+    # Sheet sync — every upload goes to a Google Sheet
+    sync_result = None
     if is_erp:
         try:
             from .sheet_sync import sync_erp_to_sheet
@@ -291,6 +372,12 @@ def upload(request):
             log.info("ERP sheet sync for %s: %s", table_key, sync_result)
         except Exception:
             log.exception("ERP sheet sync failed for %s (non-blocking)", table_key)
+            sync_result = {"ok": False, "error": "sync exception"}
+        try:
+            from .sheet_sync import sync_erp_load_log
+            sync_erp_load_log(batch, sync_result=sync_result)
+        except Exception:
+            log.exception("ERP _LOAD_LOG sync failed for %s (non-blocking)", table_key)
     else:
         try:
             from .sheet_sync import sync_upload_to_sheet
@@ -298,9 +385,11 @@ def upload(request):
             log.info("Data sheet sync for %s: %s", table_key, sync_result)
         except Exception:
             log.exception("Data sheet sync failed for %s (non-blocking)", table_key)
+            sync_result = {"ok": False, "error": "sync exception"}
 
     payload = PPCUploadBatchSerializer(batch).data
     payload["sample_row"] = parsed_rows[0] if parsed_rows else None
+    payload["sheet_sync"] = sync_result
     return Response(payload, status=status.HTTP_201_CREATED)
 
 
@@ -365,6 +454,63 @@ def table_data(request, table_key):
     })
 
 
+def _validate_erp_headers(rows, field_map, report_key):
+    """Validate ERP headers against the field map (G16).
+
+    Returns (warnings, errors) — both are lists of strings.
+    - Missing expected headers → error
+    - Unrecognised headers → warning (logged, not fatal)
+
+    Spec §ERP_LANDING: "Fail loudly on an unrecognised header."
+    We interpret "fail loudly" as: log a warning and include it in the
+    response, but don't reject the batch outright — some ERP exports
+    include extra metadata columns that aren't in our field map.
+    Missing *required* headers (from the field map) are hard errors.
+    """
+    if not field_map or not rows:
+        return [], []
+
+    header_to_key = {v.strip(): k for k, v in field_map.items()}
+    stable_keys = set(field_map.keys())
+    expected_headers = set(header_to_key.keys()) | stable_keys
+
+    # Collect all header names from the first row
+    sample = rows[0]
+    incoming = {k.strip() for k in sample.keys()}
+
+    # Unrecognised: in the data but not in the field map
+    unrecognised = incoming - expected_headers
+    warnings = []
+    if unrecognised:
+        extras = sorted(unrecognised)[:10]  # cap to avoid huge messages
+        warnings.append(
+            f"{report_key}: {len(unrecognised)} unrecognised header(s): "
+            f"{', '.join(extras)}"
+        )
+        log.warning("ERP header validation — %s", warnings[0])
+
+    # Missing: expected by the field map but absent from the data
+    # Check both stable keys and raw headers
+    matched_keys = set()
+    for h in incoming:
+        if h in stable_keys:
+            matched_keys.add(h)
+        elif h in header_to_key:
+            matched_keys.add(header_to_key[h])
+
+    missing = stable_keys - matched_keys
+    errors = []
+    if missing:
+        missing_headers = sorted(field_map[k] for k in missing)[:10]
+        errors.append(
+            f"{report_key}: {len(missing)} missing required header(s): "
+            f"{', '.join(missing_headers)}"
+        )
+        log.error("ERP header validation — %s", errors[0])
+
+    return warnings, errors
+
+
 def _rekey_erp_row(raw_row, field_map):
     """Re-key an ERP row from raw header strings to stable field keys.
 
@@ -391,8 +537,89 @@ def _rekey_erp_row(raw_row, field_map):
             rekeyed[header_to_key[stripped]] = value
         else:
             # Unknown column — keep as-is (don't lose data)
+            # G16: this is logged by _validate_erp_headers()
             rekeyed[stripped] = value
     return rekeyed
+
+
+def _maybe_freeze_fg_stock_open(batch, rekeyed_rows):
+    """G9 — Auto-freeze FG stock as FG_STOCK_OPEN on the first upload of the month.
+
+    When erp_fg_stock arrives, check if erp_fg_stock_open already has a
+    current batch whose month matches today's month. If not, clone this
+    batch as the month-open snapshot. Once frozen, it won't be overwritten
+    until next month.
+
+    Spec §ERP_LANDING: "The FG stock statement taken on day 1 of the month
+    is kept as a separate landing tab, FG_STOCK_OPEN. Opening balance must
+    not move when today's stock moves."
+    """
+    now = timezone.now()
+    month_tag = now.strftime("%Y-%m")  # e.g. "2026-09"
+
+    # Check if we already have a frozen snapshot for this month
+    existing = (
+        PPCUploadBatch.objects
+        .filter(
+            table_key="erp_fg_stock_open",
+            is_current=True,
+        )
+        .order_by("-uploaded_at")
+        .first()
+    )
+    if existing and existing.uploaded_at.strftime("%Y-%m") == month_tag:
+        log.info(
+            "FG_STOCK_OPEN already frozen for %s (batch #%d, %s). Skipping.",
+            month_tag, existing.id, existing.uploaded_at.isoformat(),
+        )
+        return {"frozen": False, "reason": f"already frozen for {month_tag}"}
+
+    # Freeze: clone this batch as erp_fg_stock_open
+    log.info(
+        "Freezing FG_STOCK_OPEN for %s from erp_fg_stock batch #%d (%d rows)",
+        month_tag, batch.id, len(rekeyed_rows),
+    )
+
+    with transaction.atomic():
+        # Demote any prior erp_fg_stock_open batches
+        PPCUploadBatch.objects.filter(
+            table_key="erp_fg_stock_open", is_current=True,
+        ).update(is_current=False)
+
+        open_batch = PPCUploadBatch.objects.create(
+            uploader=batch.uploader,
+            source_file=batch.source_file,
+            original_filename=f"FG Stock Open ({month_tag})",
+            file_type="erp",
+            level="L1",
+            table_key="erp_fg_stock_open",
+            row_count=len(rekeyed_rows),
+            is_current=True,
+            notes=f"Auto-frozen from erp_fg_stock batch #{batch.id} on {now.isoformat()}",
+        )
+
+        row_objs = [
+            PPCDataRow(
+                batch=open_batch,
+                sr_no=idx + 1,
+                table_key="erp_fg_stock_open",
+                data=row,
+            )
+            for idx, row in enumerate(rekeyed_rows)
+        ]
+        PPCDataRow.objects.bulk_create(row_objs, batch_size=500)
+
+    log.info("FG_STOCK_OPEN frozen: batch #%d, %d rows", open_batch.id, len(rekeyed_rows))
+
+    # Sync the frozen snapshot to its own sheet tab
+    try:
+        from .sheet_sync import sync_erp_to_sheet
+        sync_result = sync_erp_to_sheet(open_batch)
+        log.info("FG_STOCK_OPEN sheet sync: %s", sync_result)
+    except Exception:
+        log.exception("FG_STOCK_OPEN sheet sync failed (non-blocking)")
+
+    return {"frozen": True, "month": month_tag, "batch_id": open_batch.id}
 
 
 @api_view(["POST"])
@@ -429,6 +656,17 @@ def erp_landing(request):
 
     # Re-key rows if a field map exists for this report
     field_map = get_erp_field_map(report_key)
+
+    # G16: validate headers before re-keying
+    header_warnings, header_errors = _validate_erp_headers(rows, field_map, report_key)
+    if header_errors:
+        return Response({
+            "detail": "ERP header validation failed.",
+            "report_key": report_key,
+            "header_errors": header_errors,
+            "header_warnings": header_warnings,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
     rekeyed_rows = [_rekey_erp_row(r, field_map) for r in rows]
 
     with transaction.atomic():
@@ -459,12 +697,33 @@ def erp_landing(request):
 
     log.info("ERP landing: %s — %d rows stored (batch #%d)", report_key, len(rekeyed_rows), batch.id)
 
-    return Response({
+    # G9: auto-freeze FG stock as FG_STOCK_OPEN on first upload of the month
+    fg_open_result = None
+    if report_key == "erp_fg_stock":
+        try:
+            fg_open_result = _maybe_freeze_fg_stock_open(batch, rekeyed_rows)
+        except Exception:
+            log.exception("FG_STOCK_OPEN auto-freeze failed (non-blocking)")
+            fg_open_result = {"frozen": False, "error": "exception"}
+
+    # Append to _LOAD_LOG (fire-and-forget)
+    try:
+        from .sheet_sync import sync_erp_load_log
+        sync_erp_load_log(batch, sync_result={"ok": True})
+    except Exception:
+        log.exception("ERP _LOAD_LOG sync failed for %s (non-blocking)", report_key)
+
+    resp = {
         "report_key": report_key,
         "batch_id": batch.id,
         "row_count": len(rekeyed_rows),
         "rekeyed": field_map is not None,
-    }, status=status.HTTP_201_CREATED)
+    }
+    if header_warnings:
+        resp["header_warnings"] = header_warnings
+    if fg_open_result is not None:
+        resp["fg_stock_open"] = fg_open_result
+    return Response(resp, status=status.HTTP_201_CREATED)
 
 
 @api_view(["GET"])

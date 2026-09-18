@@ -26,12 +26,13 @@ def clean_cell(value):
     return s if s else None
 
 
-def detect_header_row(ws, known_headers, max_rows=10):
+def detect_header_row(ws, known_headers, max_rows=10, min_match=None):
     """Scan the first ``max_rows`` rows of a worksheet for the one
     that contains the most matches against ``known_headers``.
 
     Returns (row_index_0based, {col_index: header_string}).
-    Raises ValueError if no row matches even 50% of known headers.
+    Raises ValueError if no row matches at least ``min_match`` headers
+    (defaults to 50% of known_headers).
     """
     known_lower = {h.strip().lower() for h in known_headers}
     best_row = None
@@ -51,7 +52,7 @@ def detect_header_row(ws, known_headers, max_rows=10):
             best_row = row_idx
             best_map = col_map
 
-    threshold = max(1, len(known_headers) // 2)
+    threshold = min_match if min_match is not None else max(1, len(known_headers) // 2)
     if best_score < threshold:
         raise ValueError(
             f"Could not find a header row matching at least {threshold} of "

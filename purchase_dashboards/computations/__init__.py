@@ -111,6 +111,31 @@ def dedup_rows(rows):
     return result
 
 
+def exclude_locations(rows):
+    """Drop rows whose location is Production WIP or SQA Rejection.
+
+    These items are not procurement-relevant — WIP is still in process
+    and SQA Rejection is quality-rejected stock.  Filtering here (rather
+    than in the Google Sheet) keeps the raw snapshot intact for audit
+    while ensuring every dashboard only sees valid items.
+    """
+    EXCLUDED = {"production wip", "sqa rejection"}
+
+    kept, dropped = [], 0
+    for r in rows:
+        loc = (r["data"].get("location") or "").strip().lower()
+        if loc in EXCLUDED:
+            dropped += 1
+        else:
+            kept.append(r)
+    if dropped:
+        log.info(
+            "Excluded %d row(s) by location (Production WIP / SQA Rejection)",
+            dropped,
+        )
+    return kept
+
+
 def compute_all(snapshot):
     """Run every registered dashboard against a snapshot, cache the
     results in PurchaseDashResult rows. Idempotent per (snapshot, dashboard)."""
@@ -122,6 +147,7 @@ def compute_all(snapshot):
         {"sr_no": r.sr_no, "data": r.data}
         for r in snapshot.rows.all().order_by("sr_no")
     ])
+    rows = exclude_locations(rows)
     written = []
     for key, module in DASHBOARDS.items():
         result = module.compute(rows)

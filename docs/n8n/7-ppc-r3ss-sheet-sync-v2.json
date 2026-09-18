@@ -1,0 +1,402 @@
+{
+  "name": "7 — PPC R3SS Sheet Sync v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ppc-r3ss",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "wh-r3ss",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 400],
+      "webhookId": "ppc-r3ss"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract tab_name and flatten rows from the webhook payload.\n// The portal sends: { report_key, tab_name, headers, rows: [...], row_count, _meta }\n// We need to output each row as a separate n8n item so Google Sheets writes one row per item.\n\nconst body = $input.first().json.body || $input.first().json;\nconst tabName = (body.tab_name || '').trim();\nconst rows    = body.rows || [];\n\nif (!tabName) {\n  throw new Error('Missing tab_name in webhook payload');\n}\n\nif (!rows.length) {\n  // No rows — just pass through tab name for clearing\n  return [{ json: { _tabName: tabName, _empty: true } }];\n}\n\n// Output each row as a separate item, carrying _tabName for the Switch\nreturn rows.map(row => ({\n  json: { ...row, _tabName: tabName }\n}));\n"
+      },
+      "id": "extract-rows",
+      "name": "Extract Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 400]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "PLAN", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "PLAN"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "_MAP", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "_MAP"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "CONTROL", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "CONTROL"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "_IMP_MASTER", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "_IMP_MASTER"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "_IMP_DEMAND", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "_IMP_DEMAND"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "_IMP_FG", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "_IMP_FG"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "_IMP_FG_OPEN", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "_IMP_FG_OPEN"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "_IMP_DJR", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "_IMP_DJR"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true },
+                "conditions": [{ "leftValue": "={{ $json._tabName }}", "rightValue": "_IMP_INVOICE", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "_IMP_INVOICE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-tab",
+      "name": "Route by Tab",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [640, 400]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "PLAN" }
+      },
+      "id": "clear-plan",
+      "name": "Clear PLAN",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, -200],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "PLAN" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-plan",
+      "name": "Write PLAN",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, -200],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_MAP" }
+      },
+      "id": "clear-map",
+      "name": "Clear _MAP",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, -50],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_MAP" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-map",
+      "name": "Write _MAP",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, -50],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "CONTROL" }
+      },
+      "id": "clear-control",
+      "name": "Clear CONTROL",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 100],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "CONTROL" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-control",
+      "name": "Write CONTROL",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 100],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_MASTER" }
+      },
+      "id": "clear-imp-master",
+      "name": "Clear _IMP_MASTER",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 250],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_MASTER" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-imp-master",
+      "name": "Write _IMP_MASTER",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 250],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_DEMAND" }
+      },
+      "id": "clear-imp-demand",
+      "name": "Clear _IMP_DEMAND",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 400],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_DEMAND" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-imp-demand",
+      "name": "Write _IMP_DEMAND",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 400],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_FG" }
+      },
+      "id": "clear-imp-fg",
+      "name": "Clear _IMP_FG",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 550],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_FG" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-imp-fg",
+      "name": "Write _IMP_FG",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 550],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_FG_OPEN" }
+      },
+      "id": "clear-imp-fg-open",
+      "name": "Clear _IMP_FG_OPEN",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 700],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_FG_OPEN" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-imp-fg-open",
+      "name": "Write _IMP_FG_OPEN",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 700],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_DJR" }
+      },
+      "id": "clear-imp-djr",
+      "name": "Clear _IMP_DJR",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 850],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_DJR" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-imp-djr",
+      "name": "Write _IMP_DJR",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 850],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_INVOICE" }
+      },
+      "id": "clear-imp-invoice",
+      "name": "Clear _IMP_INVOICE",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [900, 1000],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "_IMP_INVOICE" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-imp-invoice",
+      "name": "Write _IMP_INVOICE",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 1000],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "GOOGLE_CRED_ID", "name": "Google Sheets" } }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Extract Rows", "type": "main", "index": 0 }]]
+    },
+    "Extract Rows": {
+      "main": [[{ "node": "Route by Tab", "type": "main", "index": 0 }]]
+    },
+    "Route by Tab": {
+      "main": [
+        [{ "node": "Clear PLAN", "type": "main", "index": 0 }],
+        [{ "node": "Clear _MAP", "type": "main", "index": 0 }],
+        [{ "node": "Clear CONTROL", "type": "main", "index": 0 }],
+        [{ "node": "Clear _IMP_MASTER", "type": "main", "index": 0 }],
+        [{ "node": "Clear _IMP_DEMAND", "type": "main", "index": 0 }],
+        [{ "node": "Clear _IMP_FG", "type": "main", "index": 0 }],
+        [{ "node": "Clear _IMP_FG_OPEN", "type": "main", "index": 0 }],
+        [{ "node": "Clear _IMP_DJR", "type": "main", "index": 0 }],
+        [{ "node": "Clear _IMP_INVOICE", "type": "main", "index": 0 }]
+      ]
+    },
+    "Clear PLAN": { "main": [[{ "node": "Write PLAN", "type": "main", "index": 0 }]] },
+    "Clear _MAP": { "main": [[{ "node": "Write _MAP", "type": "main", "index": 0 }]] },
+    "Clear CONTROL": { "main": [[{ "node": "Write CONTROL", "type": "main", "index": 0 }]] },
+    "Clear _IMP_MASTER": { "main": [[{ "node": "Write _IMP_MASTER", "type": "main", "index": 0 }]] },
+    "Clear _IMP_DEMAND": { "main": [[{ "node": "Write _IMP_DEMAND", "type": "main", "index": 0 }]] },
+    "Clear _IMP_FG": { "main": [[{ "node": "Write _IMP_FG", "type": "main", "index": 0 }]] },
+    "Clear _IMP_FG_OPEN": { "main": [[{ "node": "Write _IMP_FG_OPEN", "type": "main", "index": 0 }]] },
+    "Clear _IMP_DJR": { "main": [[{ "node": "Write _IMP_DJR", "type": "main", "index": 0 }]] },
+    "Clear _IMP_INVOICE": { "main": [[{ "node": "Write _IMP_INVOICE", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0
+}

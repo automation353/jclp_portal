@@ -545,7 +545,18 @@ def production_scorecard(request):
             "gap": round(p - a, 1),
         })
 
-    return Response({
+    # ── Sheet sync (fire-and-forget) ──
+    sheet_sync_result = None
+    if request.GET.get("sync_sheet") == "true":
+        try:
+            from .sheet_sync import sync_scorecard_to_sheet
+            sheet_sync_result = sync_scorecard_to_sheet(release)
+            log.info("Scorecard sheet sync: %s", sheet_sync_result)
+        except Exception:
+            log.exception("Scorecard sheet sync failed (non-blocking)")
+            sheet_sync_result = {"attempted": True, "ok": False, "error": "exception"}
+
+    resp = {
         "loaded": True,
         "release_id": release.pk,
         "plan_month": release.plan_month,
@@ -559,4 +570,8 @@ def production_scorecard(request):
             "rejection_pct": round(rejection_pct, 1),
         },
         "sections": sections,
-    })
+    }
+    if sheet_sync_result is not None:
+        resp["sheet_sync"] = sheet_sync_result
+
+    return Response(resp)

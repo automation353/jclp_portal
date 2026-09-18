@@ -321,6 +321,24 @@ function TileTable({ state, onClear }) {
     (f) => f && (f.picked || (f.q && f.q.trim())),
   ).length
 
+  // When filters are active, recompute subtotals from the visible rows only.
+  // Falls back to the backend-computed grand totals when no filter is on.
+  const subtotals = useMemo(() => {
+    if (!data?.subtotals) return null
+    if (activeCount === 0) return data.subtotals
+    const sums = {}
+    for (const c of columns) {
+      if (!c.numeric || data.subtotals[c.key] == null) continue
+      let total = 0
+      for (const r of shownRows) {
+        const v = typeof r[c.key] === 'number' ? r[c.key] : parseFloat(r[c.key])
+        if (isFinite(v)) total += v
+      }
+      sums[c.key] = Math.round(total * 100) / 100
+    }
+    return sums
+  }, [data?.subtotals, columns, shownRows, activeCount])
+
   if (state.loading) {
     return (
       <div className="dash-drill">
@@ -444,15 +462,15 @@ function TileTable({ state, onClear }) {
               </tr>
             ))}
           </tbody>
-          {data?.subtotals && shownRows.length > 1 && (
+          {subtotals && shownRows.length > 1 && (
             <tfoot>
               <tr className="subtotal-row">
                 {columns.map((c, ci) => (
                   <td key={c.key} className={c.numeric ? 'num' : ''}>
                     {ci === 0
-                      ? 'TOTAL'
-                      : data.subtotals[c.key] != null
-                        ? (c.rupees ? formatRupees(data.subtotals[c.key]) : formatCell(data.subtotals[c.key]))
+                      ? (activeCount > 0 ? 'FILTERED TOTAL' : 'TOTAL')
+                      : subtotals[c.key] != null
+                        ? (c.rupees ? formatRupees(subtotals[c.key]) : formatCell(subtotals[c.key]))
                         : ''}
                   </td>
                 ))}

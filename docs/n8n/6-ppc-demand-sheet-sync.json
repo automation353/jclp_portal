@@ -1,0 +1,457 @@
+{
+  "name": "6 — PPC DEMAND Sheet Sync (DEMAND_TXN + DEMAND_PART + TREND_6M)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ppc-demand",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "wh-demand",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        2000
+      ],
+      "webhookId": "ppc-demand"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst tabName  = body.tab_name  || '';\nconst headers  = body.headers   || [];\nconst rows     = body.rows      || [];\nconst appendOnly = body.append_only || false;\nif (!tabName || !headers.length) {\n  throw new Error('Missing tab_name or headers');\n}\nreturn [{ json: { tabName, rows, headers, appendOnly } }];\n"
+      },
+      "id": "prepare-demand",
+      "name": "Prepare Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "DEMAND_TXN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "DEMAND_TXN"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "DEMAND_PART",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "DEMAND_PART"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tabName }}",
+                    "rightValue": "TREND_6M",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "TREND_6M"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-demand",
+      "name": "Route by Tab",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        700,
+        2000
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 500,
+        "options": {}
+      },
+      "id": "split-demand-txn",
+      "name": "Split DEMAND_TXN",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        2200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "write-demand-txn",
+      "name": "Write DEMAND_TXN",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1210,
+        2200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "clear-demand_part",
+      "name": "Clear DEMAND_PART",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        2400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 500,
+        "options": {}
+      },
+      "id": "split-demand_part",
+      "name": "Split DEMAND_PART",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1210,
+        2400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "write-demand_part",
+      "name": "Write DEMAND_PART",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1460,
+        2400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        }
+      },
+      "id": "clear-trend_6m",
+      "name": "Clear TREND_6M",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        2600
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 500,
+        "options": {}
+      },
+      "id": "split-trend_6m",
+      "name": "Split TREND_6M",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1210,
+        2600
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "write-trend_6m",
+      "name": "Write TREND_6M",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1460,
+        2600
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": ""
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Data": {
+      "main": [
+        [
+          {
+            "node": "Route by Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Tab": {
+      "main": [
+        [
+          {
+            "node": "Split DEMAND_TXN",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear DEMAND_PART",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clear TREND_6M",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split DEMAND_TXN": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Write DEMAND_TXN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write DEMAND_TXN": {
+      "main": [
+        [
+          {
+            "node": "Split DEMAND_TXN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear DEMAND_PART": {
+      "main": [
+        [
+          {
+            "node": "Split DEMAND_PART",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split DEMAND_PART": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Write DEMAND_PART",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write DEMAND_PART": {
+      "main": [
+        [
+          {
+            "node": "Split DEMAND_PART",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear TREND_6M": {
+      "main": [
+        [
+          {
+            "node": "Split TREND_6M",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split TREND_6M": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Write TREND_6M",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write TREND_6M": {
+      "main": [
+        [
+          {
+            "node": "Split TREND_6M",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "tags": []
+}

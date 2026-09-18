@@ -1,0 +1,274 @@
+{
+  "name": "2 — PPC Pipeline Output (4 Independent Tab Flows)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ppc-pipeline-output",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "wh-02",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 550],
+      "webhookId": "ppc-pipeline-output"
+    },
+
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            {
+              "id": "type-check",
+              "leftValue": "={{ $json.body.type || $json.type }}",
+              "rightValue": "bom_explosion",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "if-type",
+      "name": "IF BOM or Scorecard",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 550]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── BOM Components branch ──\nconst body = $input.first().json.body || $input.first().json;\nconst bom  = body.bom_components || {};\nconst rows = bom.rows || [];\nif (!rows.length) return [];\nreturn [{ json: { rows } }];\n"
+      },
+      "id": "extract-bom",
+      "name": "Extract BOM Components",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 200]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PIPELINE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "BOM Components" }
+      },
+      "id": "clear-bom",
+      "name": "Clear BOM Components",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1020, 200],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Extract BOM Components').first().json.rows || [];\nif (!rows.length) return [];\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "split-bom",
+      "name": "Split BOM Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1280, 200]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PIPELINE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "BOM Components" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-bom",
+      "name": "Write BOM Components",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1540, 200],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── Shortages branch ──\nconst body = $input.first().json.body || $input.first().json;\nconst short = body.shortages || {};\nconst rows  = short.rows || [];\nif (!rows.length) return [];\nreturn [{ json: { rows } }];\n"
+      },
+      "id": "extract-short",
+      "name": "Extract Shortages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 450]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PIPELINE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Shortages" }
+      },
+      "id": "clear-short",
+      "name": "Clear Shortages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1020, 450],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Extract Shortages').first().json.rows || [];\nif (!rows.length) return [];\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "split-short",
+      "name": "Split Shortage Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1280, 450]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PIPELINE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Shortages" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-short",
+      "name": "Write Shortages",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1540, 450],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── Scorecard Overall branch ──\nconst body = $input.first().json.body || $input.first().json;\nconst overall = body.overall || {};\n// overall is a single summary object, write as one row\nconst row = {\n  Planned:        overall['Planned']       || 0,\n  Actual:         overall['Actual']        || 0,\n  'Adherence %':  overall['Adherence %']   || 0,\n  Backlog:        overall['Backlog']       || 0,\n  Rejected:       overall['Rejected']      || 0,\n  'Rejection %':  overall['Rejection %']   || 0,\n};\nreturn [{ json: { rows: [row] } }];\n"
+      },
+      "id": "extract-overall",
+      "name": "Extract Scorecard Overall",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 700]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PIPELINE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Scorecard Overall" }
+      },
+      "id": "clear-overall",
+      "name": "Clear Scorecard Overall",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1020, 700],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Extract Scorecard Overall').first().json.rows || [];\nif (!rows.length) return [];\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "split-overall",
+      "name": "Split Overall Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1280, 700]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PIPELINE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Scorecard Overall" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-overall",
+      "name": "Write Scorecard Overall",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1540, 700],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── Scorecard Sections branch ──\nconst body = $input.first().json.body || $input.first().json;\nconst sections = (body.sections || {}).rows || [];\nif (!sections.length) return [];\nreturn [{ json: { rows: sections } }];\n"
+      },
+      "id": "extract-sections",
+      "name": "Extract Scorecard Sections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 950]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PIPELINE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Scorecard Sections" }
+      },
+      "id": "clear-sections",
+      "name": "Clear Scorecard Sections",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1020, 950],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Extract Scorecard Sections').first().json.rows || [];\nif (!rows.length) return [];\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "split-sections",
+      "name": "Split Section Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1280, 950]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PIPELINE_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Scorecard Sections" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-sections",
+      "name": "Write Scorecard Sections",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1540, 950],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "IF BOM or Scorecard", "type": "main", "index": 0 }]]
+    },
+    "IF BOM or Scorecard": {
+      "main": [
+        [
+          { "node": "Extract BOM Components",     "type": "main", "index": 0 },
+          { "node": "Extract Shortages",           "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Extract Scorecard Overall",   "type": "main", "index": 0 },
+          { "node": "Extract Scorecard Sections",  "type": "main", "index": 0 }
+        ]
+      ]
+    },
+
+    "Extract BOM Components":     { "main": [[{ "node": "Clear BOM Components",     "type": "main", "index": 0 }]] },
+    "Clear BOM Components":       { "main": [[{ "node": "Split BOM Rows",           "type": "main", "index": 0 }]] },
+    "Split BOM Rows":             { "main": [[{ "node": "Write BOM Components",     "type": "main", "index": 0 }]] },
+
+    "Extract Shortages":          { "main": [[{ "node": "Clear Shortages",          "type": "main", "index": 0 }]] },
+    "Clear Shortages":            { "main": [[{ "node": "Split Shortage Rows",      "type": "main", "index": 0 }]] },
+    "Split Shortage Rows":        { "main": [[{ "node": "Write Shortages",          "type": "main", "index": 0 }]] },
+
+    "Extract Scorecard Overall":  { "main": [[{ "node": "Clear Scorecard Overall",  "type": "main", "index": 0 }]] },
+    "Clear Scorecard Overall":    { "main": [[{ "node": "Split Overall Rows",       "type": "main", "index": 0 }]] },
+    "Split Overall Rows":         { "main": [[{ "node": "Write Scorecard Overall",  "type": "main", "index": 0 }]] },
+
+    "Extract Scorecard Sections": { "main": [[{ "node": "Clear Scorecard Sections", "type": "main", "index": 0 }]] },
+    "Clear Scorecard Sections":   { "main": [[{ "node": "Split Section Rows",       "type": "main", "index": 0 }]] },
+    "Split Section Rows":         { "main": [[{ "node": "Write Scorecard Sections", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "PPC Pipeline" }, { "name": "Sheet Sync" }],
+  "meta": { "instanceId": "jollyclamps" },
+  "pinData": {},
+  "_comment": "POST /webhook/ppc-pipeline-output — IF routes by payload type. BOM requests → 2 independent flows (BOM Components + Shortages). Scorecard requests → 2 independent flows (Overall + Sections). Each flow only touches its own tab. Replace PASTE_PPC_PIPELINE_SHEET_ID and PASTE_CREDENTIAL_ID."
+}

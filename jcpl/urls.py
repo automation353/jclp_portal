@@ -15,6 +15,7 @@ urlpatterns = [
     path("api/purchase-controls/", include("purchase_controls.urls")),
     path("api/ppc-data/", include("ppc_data.urls")),
     path("api/sop/", include("sop.urls")),
+    path("api/admin-panel/", include("accounts.api_urls")),
     # Server-rendered pages. Team Accounts and Login Activity still live here
     # until they're ported into the React portal.
     path("accounts/", include("accounts.urls")),

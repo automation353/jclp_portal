@@ -7,51 +7,47 @@ import TopBar from '../components/TopBar'
  * Master tables and their expected filenames — drives the reference table
  * shown below the upload zone, and helps the user know what to upload.
  */
+/**
+ * R3SS-essential master tables only.
+ * Non-essential masters (route_master, operation_stage_map, capacity_ppp,
+ * machine_master, customer_part, rate_asp) are needed for L5-L8 phases
+ * and will be added back when those phases are built.
+ */
 const MASTER_TABLES = [
   { key: 'item_master',         ref: 'W1.1',  file: 'Product Group Mapping.xlsx',      label: 'Item Master',           rows: '~4,822',  source: 'ERP' },
   { key: 'family_hierarchy',    ref: 'W1.2',  file: 'Monitoring.xlsx (Family Group)',   label: 'Family Hierarchy',      rows: '~4,000',  source: 'File' },
-  { key: 'route_master',        ref: 'W1.4',  file: 'Process File.xlsx',               label: 'Route Master',          rows: '~200',    source: 'File' },
-  { key: 'operation_stage_map', ref: 'W1.5',  file: 'In process-Rejection.xlsx',       label: 'Operation Stage Map',   rows: '~77',     source: 'File' },
-  { key: 'capacity_ppp',        ref: 'W1.6',  file: 'Production Targets.xlsx',         label: 'Capacity / PPP',        rows: '~50',     source: 'File' },
-  { key: 'machine_master',      ref: 'W1.7',  file: 'Machine Loading data.xlsx',       label: 'Machine Master',        rows: '~150',    source: 'File' },
+  { key: 'stock_policy',        ref: 'W1.14', file: 'Green Level RM/CP/Packing.xlsx',  label: 'Stock Policy (Green)',  rows: '~1,500',  source: 'File' },
   { key: 'batch_ebq',           ref: 'W1.8',  file: 'Monitoring.xlsx (EBQ / Batch)',   label: 'Batch / EBQ',           rows: '~80',     source: 'File' },
   { key: 'lead_time',           ref: 'W1.9',  file: 'Lead Time Data.xlsx',             label: 'Lead Time',             rows: '~1,684',  source: 'File' },
-  { key: 'bom_master',          ref: 'W1.11', file: 'BOM_Item_Template.xlsx',          label: 'BOM Master',            rows: '~37,149', source: 'ERP' },
   { key: 'part_engineering',    ref: 'W1.12', file: 'T-Bolt BOM master.xlsx',          label: 'Part Engineering',      rows: '~500',    source: 'File' },
-  { key: 'customer_part',       ref: 'W1.13', file: 'SO Tracking Master.xlsx',         label: 'Customer-Part',         rows: '~2,000',  source: 'File' },
-  { key: 'stock_policy',        ref: 'W1.14', file: 'Green Level RM/CP/Packing.xlsx',  label: 'Stock Policy (Green)',  rows: '~1,500',  source: 'File' },
-  { key: 'rate_asp',            ref: 'W1.16', file: 'ASP for FG.xlsx',                 label: 'Rate / ASP',            rows: '~1,837',  source: 'ERP' },
+  { key: 'bom_master',          ref: 'W1.11', file: 'BOM_Item_Template.xlsx',          label: 'BOM Master',            rows: '~37,149', source: 'ERP' },
 ]
 
 // Tables managed via UI forms (no file upload)
 const FORM_TABLES = [
-  { key: 'site_plant_section', ref: 'W1.3',  label: 'Site / Plant / Section', note: '~30 rows, editable grid' },
   { key: 'working_calendar',   ref: 'W1.10', label: 'Working Calendar',       note: 'maintain 1 year ahead' },
-  { key: 'packing_spec',       ref: 'W1.15', label: 'Packing Spec',           note: 'must build from scratch' },
-  { key: 'reason_codes',       ref: 'W1.17', label: 'Reason Codes',           note: 'controlled list' },
 ]
 
 /**
- * ERP reports — previously pulled via n8n, now also uploadable manually.
+ * R3SS source files — uploaded monthly (or as data refreshes).
+ * These feed directly into compute_r3ss.py when Recompute is triggered.
+ */
+const R3SS_SOURCE_TABLES = [
+  { key: 'fg_stock_statement', ref: 'S1', file: 'FG.xlsx',                   label: 'FG Stock Statement',    freq: 'Monthly', note: 'Opening Balance, FG (closing qty)' },
+  { key: 'dpr_production',     ref: 'S2', file: 'DPR all Plant.xlsx',        label: 'DPR Production',        freq: 'Monthly', note: 'Pack (FG produced qty)' },
+  { key: 'fg_dispatch',        ref: 'S3', file: 'FG Issue qty .xlsx',        label: 'FG Dispatch',           freq: 'Monthly', note: 'Disp (sales/dispatch qty)' },
+  { key: 'mps_schedule_form',  ref: 'S4', file: 'MpsSS.xlsm',               label: 'MPS Schedule Form',     freq: 'Monthly', note: 'W1-W5 weeks, Additional Demand' },
+  { key: 'demand_freeze',      ref: 'S5', file: 'August forecast 2026.xlsx', label: 'Demand Freeze',         freq: 'Monthly', note: 'Initial Demand (also via Demand Freeze page)' },
+]
+
+/**
+ * R3SS-essential ERP reports only.
+ * Other ERP reports (CP/RM/PM stock, consumables, pending PO/PR, etc.)
+ * will be added for L5-L8 phases.
  */
 const ERP_TABLES = [
-  { key: 'erp_item_master',   ref: 'E1',  label: 'Item Master (ERP)',      freq: 'Daily' },
-  { key: 'erp_bom',           ref: 'E2',  label: 'BOM (ERP)',              freq: 'Daily' },
-  { key: 'erp_fg_stock',      ref: 'E3',  label: 'FG Stock',               freq: 'Daily' },
-  { key: 'erp_cp_stock',      ref: 'E4',  label: 'CP Stock',               freq: 'Daily' },
-  { key: 'erp_rm_stock',      ref: 'E5',  label: 'RM Stock',               freq: 'Daily' },
-  { key: 'erp_pm_stock',      ref: 'E6',  label: 'PM Stock',               freq: 'Daily' },
-  { key: 'erp_consumables',   ref: 'E7',  label: 'Consumables',            freq: 'Daily' },
-  { key: 'erp_prod_fg',       ref: 'E8',  label: 'Production FG',          freq: 'Daily' },
-  { key: 'erp_prod_semi',     ref: 'E9',  label: 'Production Semi',        freq: 'Daily' },
-  { key: 'erp_dispatch',      ref: 'E10', label: 'Dispatch',               freq: 'Daily' },
-  { key: 'erp_forecast',      ref: 'E11', label: 'Forecast',               freq: 'Weekly' },
-  { key: 'erp_sales_orders',  ref: 'E12', label: 'Sales Orders',           freq: 'Daily' },
-  { key: 'erp_pending_po',    ref: 'E13', label: 'Pending PO',             freq: 'Daily' },
-  { key: 'erp_pending_pr',    ref: 'E14', label: 'Pending PR',             freq: 'Daily' },
-  { key: 'erp_material_issue',ref: 'E15', label: 'Material Issue',         freq: 'Daily' },
-  { key: 'erp_item_cost',     ref: 'E16', label: 'Item Cost',              freq: 'Monthly' },
-  { key: 'erp_fg_ageing',     ref: 'E17', label: 'FG Ageing',              freq: 'Weekly' },
+  { key: 'erp_fg_stock',      ref: 'E3',  label: 'FG Stock Report',        freq: 'Daily',  note: 'Opening + Receipt + Issued + Closing' },
+  { key: 'erp_sales_orders',  ref: 'E12', label: 'Sales Orders (SO)',      freq: 'Daily',  note: 'SO Tracking Master — recheck' },
 ]
 
 export default function PPCDataUpload() {
@@ -85,22 +81,34 @@ export default function PPCDataUpload() {
   async function handleUpload(file) {
     if (!file) return
     setUploading(true)
-    setUploadMsg({ kind: 'loading', text: `Uploading and parsing ${file.name}…` })
+    setUploadMsg({ kind: 'loading', text: `Uploading and parsing ${file.name}…`, step: 1 })
     try {
+      const timer = setTimeout(() => {
+        setUploadMsg(prev => prev?.step === 1
+          ? { kind: 'loading', text: `Syncing ${file.name} to Google Sheet…`, step: 2 }
+          : prev)
+      }, 3000)
       const result = await api.ppcDataUpload(file, notes, manualKey || undefined)
+      clearTimeout(timer)
       const rows = result.row_count || 0
       const table = result.table_key || '?'
+      const syncOk = result.sheet_sync?.ok
+      const syncMsg = syncOk === true
+        ? ' Data synced to Google Sheet.'
+        : syncOk === false
+          ? ' (Sheet sync failed — data saved locally)'
+          : ''
       setUploadMsg({
         kind: result.parse_error ? 'error' : 'success',
         text: result.parse_error
-          ? `❌ Parse failed for ${result.original_filename}: ${result.parse_error}`
-          : `✅ ${result.original_filename} → ${table} — ${rows.toLocaleString()} rows parsed and stored.`,
+          ? `Parse failed for ${result.original_filename}: ${result.parse_error}`
+          : `${result.original_filename} → ${table} — ${rows.toLocaleString()} rows parsed.${syncMsg}`,
       })
       setNotes('')
       setManualKey('')
       await refresh()
     } catch (err) {
-      setUploadMsg({ kind: 'error', text: `❌ ${err.message}` })
+      setUploadMsg({ kind: 'error', text: err.message })
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -138,7 +146,7 @@ export default function PPCDataUpload() {
             which table it belongs to from the filename and parses it into the database.
           </p>
           <p className="note" style={{ marginBottom: 16, fontSize: 12, color: 'var(--muted)' }}>
-            Supported: .xlsx and .xlsm files · Auto-detects 30+ file types (13 masters + 17 ERP) · See reference tables below
+            Supported: .xlsx and .xlsm files · {MASTER_TABLES.length} masters + {R3SS_SOURCE_TABLES.length} R3SS sources + {ERP_TABLES.length} ERP · See reference tables below
           </p>
 
           {/* Drop zone */}
@@ -183,7 +191,7 @@ export default function PPCDataUpload() {
                 style={{ width: '100%', padding: 8, marginTop: 4, border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff' }}
               >
                 <option value="">Auto-detect from filename</option>
-                {parsers.map((k) => (
+                {[...MASTER_TABLES.map(t => t.key), ...R3SS_SOURCE_TABLES.map(t => t.key), ...ERP_TABLES.map(t => t.key)].map((k) => (
                   <option key={k} value={k}>{k}</option>
                 ))}
               </select>
@@ -216,7 +224,7 @@ export default function PPCDataUpload() {
         <div className="panel">
           <h3 style={{ marginBottom: 12 }}>📊 Foundation Tables — Load Status</h3>
           <p className="note" style={{ marginBottom: 16 }}>
-            {Object.keys(loadedTables).length} of 17 tables loaded.
+            {MASTER_TABLES.filter(t => loadedTables[t.key]).length} of {MASTER_TABLES.length} master tables loaded.
             Green = has current data. Grey = not yet uploaded.
           </p>
           <div className="table-scroll">
@@ -285,12 +293,68 @@ export default function PPCDataUpload() {
           </div>
         </div>
 
+        {/* R3SS Source Files status */}
+        <div className="panel">
+          <h3 style={{ marginBottom: 12 }}>📊 R3SS Source Files — Load Status</h3>
+          <p className="note" style={{ marginBottom: 16 }}>
+            {R3SS_SOURCE_TABLES.filter(t => loadedTables[t.key]).length} of {R3SS_SOURCE_TABLES.length} R3SS source files loaded.
+            Upload these monthly before running Recompute on the R3SS Plan page.
+          </p>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ref</th>
+                  <th>Table</th>
+                  <th>Frequency</th>
+                  <th>Status</th>
+                  <th>Rows</th>
+                  <th>Last upload</th>
+                  <th>File</th>
+                  <th>Expected file</th>
+                </tr>
+              </thead>
+              <tbody>
+                {R3SS_SOURCE_TABLES.map((t) => {
+                  const loaded = loadedTables[t.key]
+                  return (
+                    <tr key={t.key}>
+                      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{t.ref}</td>
+                      <td>
+                        {loaded
+                          ? <Link to={`/ppc-data/browse?table=${t.key}`} style={{ fontWeight: 600 }}>{t.label}</Link>
+                          : <span>{t.label}</span>}
+                      </td>
+                      <td className="muted" style={{ fontSize: 12 }}>{t.freq}</td>
+                      <td>
+                        {loaded
+                          ? <span style={{ color: 'var(--ok)', fontWeight: 700, fontSize: 12 }}>● Loaded</span>
+                          : <span style={{ color: 'var(--muted)', fontSize: 12 }}>○ Empty</span>}
+                      </td>
+                      <td style={{ fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>
+                        {loaded ? loaded.row_count.toLocaleString() : '—'}
+                      </td>
+                      <td className="muted" style={{ fontSize: 12 }}>
+                        {loaded ? new Date(loaded.uploaded_at).toLocaleString() : '—'}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        {loaded ? loaded.original_filename : '—'}
+                      </td>
+                      <td className="muted" style={{ fontSize: 12 }}>{t.file}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* ERP Tables status */}
         <div className="panel">
           <h3 style={{ marginBottom: 12 }}>📡 ERP Reports — Load Status</h3>
           <p className="note" style={{ marginBottom: 16 }}>
-            {ERP_TABLES.filter(t => loadedTables[t.key]).length} of 17 ERP tables loaded.
-            Upload the TCS iON Excel exports here. Select from the dropdown if auto-detect doesn't match.
+            {ERP_TABLES.filter(t => loadedTables[t.key]).length} of {ERP_TABLES.length} ERP reports loaded.
+            Upload FG Stock Report daily. SO Tracking as needed.
           </p>
           <div className="table-scroll">
             <table>

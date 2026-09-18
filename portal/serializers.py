@@ -38,9 +38,18 @@ class UserSerializer(serializers.Serializer):
     role_display = serializers.SerializerMethodField()
     department = serializers.CharField()
     is_super_admin = serializers.BooleanField()
+    modules = serializers.SerializerMethodField()
 
     def get_full_name(self, obj):
         return obj.get_full_name()
 
     def get_role_display(self, obj):
         return obj.get_role_display()
+
+    def get_modules(self, obj):
+        from portal.data import DEPARTMENTS
+        if obj.role == "super_admin":
+            return [d["slug"] for d in DEPARTMENTS]
+        return list(
+            obj.module_access.values_list("module_slug", flat=True)
+        )

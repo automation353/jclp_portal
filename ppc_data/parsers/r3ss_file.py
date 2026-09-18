@@ -22,7 +22,7 @@ from datetime import datetime
 
 from openpyxl import load_workbook
 
-from ..field_maps.r3ss_plan import FIELD_MAP as PLAN_FIELDS
+from ..field_maps.r3ss_plan import FIELD_MAP as PLAN_FIELDS, HEADER_ALIASES as PLAN_ALIASES
 from ..field_maps.r3ss_summary import FIELD_MAP as SUMMARY_FIELDS
 from .base import clean_cell, detect_header_row
 
@@ -155,12 +155,19 @@ def parse(file_path):
 
     ws = wb[sheet_name]
 
-    # Build reverse map for fixed columns
-    header_to_key = {v.strip(): k for k, v in PLAN_FIELDS.items()}
-    known_headers = list(header_to_key.keys())
+    # Build reverse map for fixed columns — case-insensitive to handle
+    # both simplified uploads ("Item Code") and real R3SS files ("ERP Code")
+    header_to_key = {}
+    for k, v in PLAN_FIELDS.items():
+        header_to_key[v.strip().lower()] = k
+    for alias_header, stable_key in PLAN_ALIASES.items():
+        header_to_key[alias_header.strip().lower()] = stable_key
+    known_headers = list({v.strip() for v in PLAN_FIELDS.values()} |
+                         set(PLAN_ALIASES.keys()))
 
-    # Step 1: Find the header row
-    header_row_idx, col_map = detect_header_row(ws, known_headers)
+    # Step 1: Find the header row (min_match=6 so both simplified and
+    # real R3SS files pass — real files share fewer canonical headers)
+    header_row_idx, col_map = detect_header_row(ws, known_headers, min_match=6)
 
     # Step 2: Classify every column in the header row as fixed or date
     fixed_cols = {}   # col_idx -> stable_key
@@ -177,10 +184,20 @@ def parse(file_path):
         wb.close()
         raise ValueError("Could not read header row")
 
-    # First, map known fixed columns
+    # Map known fixed columns (case-insensitive lookup)
     for col_idx, header_str in col_map.items():
-        key = header_to_key.get(header_str.strip())
+        key = header_to_key.get(header_str.strip().lower())
         if key:
+            fixed_cols[col_idx] = key
+
+    # Also scan ALL header cells for aliases that detect_header_row
+    # may have matched but col_map stored with original casing
+    for col_idx, cell_val in enumerate(header_row):
+        if col_idx in fixed_cols or cell_val is None:
+            continue
+        label = str(cell_val).strip().lower()
+        key = header_to_key.get(label)
+        if key and key not in fixed_cols.values():
             fixed_cols[col_idx] = key
 
     # Now try to parse remaining columns as dates

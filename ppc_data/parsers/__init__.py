@@ -9,7 +9,6 @@ Import the registry via ``from ppc_data.parsers import PARSERS``.
 Tables without parsers (UI-form-only):
   - site_plant_section (W1.3)  — admin / API CRUD
   - working_calendar   (W1.10) — admin / API CRUD
-  - packing_spec       (W1.15) — must be built from scratch
   - reason_codes       (W1.17) — admin / API CRUD
 """
 
@@ -18,7 +17,10 @@ from . import (
     bom_template,
     customer_part_file,
     dispatch_trends,
+    dpr_production,
     family_hierarchy,
+    fg_dispatch,
+    fg_stock_statement,
     forecast_demand,
     green_levels,
     lead_time_data,
@@ -26,6 +28,8 @@ from . import (
     monitoring_ebq,
     mps_history_file,
     mps_schedule_file,
+    mps_schedule_form,
+    packing_spec_file,
     part_engineering_file,
     planning_calendar_file,
     process_file,
@@ -53,6 +57,7 @@ PARSERS = {
     customer_part_file.TABLE_KEY:     customer_part_file,       # customer_part
     green_levels.TABLE_KEY:           green_levels,             # stock_policy
     asp_fg.TABLE_KEY:                 asp_fg,                   # rate_asp
+    packing_spec_file.TABLE_KEY:      packing_spec_file,         # packing_spec (W1.15)
 
     # L2 demand
     forecast_demand.TABLE_KEY:        forecast_demand,           # demand_freeze
@@ -60,8 +65,14 @@ PARSERS = {
 
     # L3 MPS
     mps_schedule_file.TABLE_KEY:      mps_schedule_file,         # mps_schedule
+    mps_schedule_form.TABLE_KEY:      mps_schedule_form,         # mps_schedule_form
     mps_history_file.TABLE_KEY:       mps_history_file,          # mps_history
     planning_calendar_file.TABLE_KEY: planning_calendar_file,    # planning_calendar
+
+    # R3SS source files
+    fg_stock_statement.TABLE_KEY:     fg_stock_statement,        # fg_stock_statement
+    dpr_production.TABLE_KEY:         dpr_production,            # dpr_production
+    fg_dispatch.TABLE_KEY:            fg_dispatch,               # fg_dispatch
 
     # L4 R3SS plan (dynamic date columns)
     r3ss_file.TABLE_KEY:              r3ss_file,                  # r3ss_plan

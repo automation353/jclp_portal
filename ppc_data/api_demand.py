@@ -148,6 +148,14 @@ def demand_freeze(request):
         f"{frozen_count} items frozen, {skipped_count} already existed.",
     )
 
+    # Sync to DEMAND Google Sheet (fire-and-forget)
+    try:
+        from .sheet_sync import sync_demand_sheet
+        sheet_result = sync_demand_sheet(month)
+        log.info("Demand sheet sync for %s: %s", month, sheet_result)
+    except Exception:
+        log.exception("Demand sheet sync failed for %s (non-blocking)", month)
+
     return Response({
         "batch_id": batch.pk,
         "month": month,
@@ -266,6 +274,14 @@ def demand_transaction(request):
         f"{created_count} transactions, {no_freeze_count} items had no freeze.",
     )
 
+    # Sync to DEMAND Google Sheet (fire-and-forget)
+    try:
+        from .sheet_sync import sync_demand_sheet
+        sheet_result = sync_demand_sheet(month)
+        log.info("Demand sheet sync for %s: %s", month, sheet_result)
+    except Exception:
+        log.exception("Demand sheet sync failed for %s (non-blocking)", month)
+
     return Response({
         "batch_id": batch.pk,
         "month": month,
@@ -370,3 +386,76 @@ def demand_months(request):
         })
 
     return Response({"months": result})
+
+
+@api_view(["GET"])
+def demand_freeze_gate(request):
+    """Check whether demand is frozen and ready for MPS.
+
+    Query params:
+      ?month=2026-09   — required
+
+    Returns a gate check: is demand frozen? Are there enough items?
+    The MPS engine must call this before running — downstream cannot
+    proceed against unfrozen demand (Rule 3).
+
+    Spec §3.2: "INITIAL rows are written once at month open from
+    FORECAST plus open sales orders, then locked."
+    """
+    month = request.GET.get("month", "").strip()
+    if not month:
+        return Response(
+            {"detail": "Provide ?month=YYYY-MM"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    freeze_count = PPCDemandFreeze.objects.filter(month=month).count()
+    tx_count = PPCDemandTransaction.objects.filter(
+        freeze__month=month,
+    ).count()
+
+    if freeze_count == 0:
+        return Response({
+            "month": month,
+            "gate": "BLOCKED",
+            "reason": "No demand frozen for this month. Run demand freeze first.",
+            "frozen_items": 0,
+            "transaction_count": 0,
+        })
+
+    # Gate passes if at least some demand is frozen
+    return Response({
+        "month": month,
+        "gate": "PASS",
+        "frozen_items": freeze_count,
+        "transaction_count": tx_count,
+        "reason": f"Demand frozen: {freeze_count} items, {tx_count} transactions.",
+    })
+
+
+@api_view(["POST"])
+def demand_sync_sheet(request):
+    """Trigger manual sync of all 3 DEMAND tabs for a month.
+
+    POST body or query param:
+      month=2026-09    — required
+
+    Syncs DEMAND_TXN, DEMAND_PART, and TREND_6M to the DEMAND Google Sheet.
+    """
+    month = (
+        request.data.get("month")
+        or request.GET.get("month", "")
+    ).strip()
+    if not month or len(month) != 7:
+        return Response(
+            {"detail": "Provide 'month' in YYYY-MM format."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from .sheet_sync import sync_demand_sheet
+    results = sync_demand_sheet(month)
+
+    return Response({
+        "month": month,
+        "sync_results": results,
+    })

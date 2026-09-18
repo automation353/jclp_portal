@@ -16,4 +16,14 @@ FIELD_MAP = {
     "section":          "Section",
 }
 
+# EBQ Qualification.xlsx has per-item EBQ with different headers
+FIELD_MAP_QUAL = {
+    "family":           "Family",
+    "customer":         "Customer",
+    "cust_part_no":     "Part No.",
+    "jolly_size":       "Jolly Size",
+    "erp_code":         "ERP Code",
+    "ebq_qty":          "EBQ",
+}
+
 HEADER_TO_KEY = {v: k for k, v in FIELD_MAP.items()}

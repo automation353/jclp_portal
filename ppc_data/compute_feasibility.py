@@ -2,10 +2,11 @@
 
 Rule 5: capacity is a gate — plan cannot release without passing.
 
-Three checks:
+Four checks:
   1. Capacity check — day × product_group plan vs W1.6 capacity
   2. Machine loading — day × machine utilization via W1.4 route + W1.7 machines
   3. EBQ qualification — family plan vs W1.8 minimum batch
+  4. Manpower check — day × section headcount vs W1.6 manpower_shift
 """
 
 import logging
@@ -162,8 +163,9 @@ def _machine_loading(run, plan_rows):
             mach_capacity[mc] = cap
 
     # Aggregate machine loading by machine × date
-    # For each plan item: find family → route → machines → load = qty / capacity_shift
-    machine_load = defaultdict(lambda: defaultdict(float))  # machine → date → total_qty
+    # For each plan item: find family → route → machines
+    # load = qty × cycle_time (minutes), compared against machine hours × 60
+    machine_load_mins = defaultdict(lambda: defaultdict(float))  # machine → date → minutes
 
     for r in plan_rows:
         fam = txt(r.get("family")).upper()
@@ -174,18 +176,34 @@ def _machine_loading(run, plan_rows):
             q = num0(qty)
             if q <= 0:
                 continue
-            for mach, _ct in route_by_family[fam]:
-                machine_load[mach][d] += q
+            for mach, ct in route_by_family[fam]:
+                if ct > 0:
+                    # cycle_time is minutes per piece — convert qty to time
+                    machine_load_mins[mach][d] += q * ct
+                else:
+                    # No cycle time — fall back to raw qty comparison
+                    machine_load_mins[mach][d] += q
 
     # Flag overloaded machines
+    # capacity_shift is qty per shift; convert to minutes using 480 min/shift
+    SHIFT_MINUTES = 480
     flags_created = 0
-    for mach, dates in machine_load.items():
-        cap = mach_capacity.get(mach, 0)
-        if cap <= 0:
+    for mach, dates in machine_load_mins.items():
+        raw_cap = mach_capacity.get(mach, 0)
+        if raw_cap <= 0:
             continue
 
-        for d, loaded_qty in sorted(dates.items()):
-            utilization = (loaded_qty / cap) * 100
+        for d, loaded in sorted(dates.items()):
+            # If any route for this machine has cycle_time, loaded is in minutes
+            # Compare against shift minutes. If no cycle_time was used,
+            # loaded is raw qty — compare against raw_cap.
+            # Heuristic: if loaded > 10 × raw_cap, it's likely in minutes
+            if loaded > raw_cap * 10:
+                cap = SHIFT_MINUTES  # loaded is in minutes
+            else:
+                cap = raw_cap  # loaded is in qty
+
+            utilization = (loaded / cap) * 100
             if utilization > 100:
                 overload = utilization - 100
                 PPCCapacityFlag.objects.create(
@@ -195,12 +213,13 @@ def _machine_loading(run, plan_rows):
                     product_group="",
                     section="",
                     item_code="",
-                    planned_qty=loaded_qty,
+                    planned_qty=round(loaded, 1),
                     capacity_qty=cap,
                     overload_pct=round(overload, 1),
                     detail={
                         "machine_code": mach,
                         "utilization_pct": round(utilization, 1),
+                        "unit": "minutes" if loaded > raw_cap * 10 else "qty",
                     },
                 )
                 flags_created += 1
@@ -273,11 +292,96 @@ def _ebq_check(run, plan_rows):
     return flags_created
 
 
+# ── 4. Manpower check ──────────────────────────────────────────
+
+
+def _manpower_check(run, plan_rows):
+    """Check if planned daily output per section fits available manpower.
+
+    capacity_ppp (W1.6) has manpower_shift per section/product_group.
+    This is a softer check — flags sections where planned daily qty
+    exceeds what the available manpower can produce at target PPP.
+
+    Spec §3.4: MANPOWER is a tab in the CAPACITY sheet.
+    """
+    cap_rows = _load_current_rows("capacity_ppp")
+    if not cap_rows:
+        log.warning("Feasibility: no capacity_ppp data — skipping manpower check")
+        return 0
+
+    # Build manpower capacity by section:
+    # manpower_shift × target_ppp_8h = daily output capacity per section
+    section_capacity = {}
+    for r in cap_rows:
+        sec = txt(r.get("section")).upper()
+        if not sec:
+            continue
+        manpower = num0(r.get("manpower_shift"))
+        ppp_8h = num0(r.get("target_ppp_8h"))
+        if manpower > 0 and ppp_8h > 0:
+            daily_output = manpower * ppp_8h
+            if sec in section_capacity:
+                section_capacity[sec]["output"] += daily_output
+                section_capacity[sec]["headcount"] += manpower
+            else:
+                section_capacity[sec] = {
+                    "output": daily_output,
+                    "headcount": manpower,
+                }
+
+    if not section_capacity:
+        log.warning("Feasibility: no manpower data in capacity_ppp — skipping")
+        return 0
+
+    # Aggregate plan by section × date
+    plan_by_sec_date = defaultdict(lambda: defaultdict(float))
+    for r in plan_rows:
+        sec = txt(r.get("section")).upper()
+        if not sec:
+            continue
+        days = r.get("days", {})
+        for d, qty in days.items():
+            if qty and num0(qty) > 0:
+                plan_by_sec_date[sec][d] += num0(qty)
+
+    # Flag overloads
+    flags_created = 0
+    for sec, dates in plan_by_sec_date.items():
+        cap_info = section_capacity.get(sec)
+        if not cap_info or cap_info["output"] <= 0:
+            continue
+
+        daily_cap = cap_info["output"]
+        headcount = cap_info["headcount"]
+
+        for d, planned in sorted(dates.items()):
+            if planned > daily_cap:
+                overload = ((planned - daily_cap) / daily_cap) * 100
+                PPCCapacityFlag.objects.create(
+                    run=run,
+                    flag_type="manpower",
+                    date=d,
+                    product_group="",
+                    section=sec,
+                    planned_qty=planned,
+                    capacity_qty=daily_cap,
+                    overload_pct=round(overload, 1),
+                    detail={
+                        "headcount": headcount,
+                        "target_ppp_8h": round(daily_cap / headcount, 1) if headcount else 0,
+                        "daily_output_capacity": daily_cap,
+                    },
+                )
+                flags_created += 1
+
+    return flags_created
+
+
 # ── Main entry point ─────────────────────────────────────────────
 
 
 def run_feasibility(plan_batch_id):
-    """Run all three feasibility checks on a plan batch.
+    """Run all four feasibility checks on a plan batch.
 
     Returns the PPCFeasibilityRun instance with summary.
     """
@@ -287,8 +391,23 @@ def run_feasibility(plan_batch_id):
     if not plan_rows:
         raise ValueError("Plan batch has no rows")
 
-    # Detect plan month
-    plan_month = plan_rows[0].get("_plan_month", "unknown")
+    # Detect plan month from data or from batch notes
+    plan_month = plan_rows[0].get("_plan_month", "")
+    if not plan_month:
+        # Try to parse from batch notes (compute_r3ss stores "for YYYY-MM")
+        notes = plan_batch.notes or ""
+        for token in notes.split():
+            if len(token) == 7 and token[4] == "-":
+                plan_month = token
+                break
+        if not plan_month:
+            plan_month = "unknown"
+
+    # Guard: retire any previous pending/running runs for this batch
+    PPCFeasibilityRun.objects.filter(
+        plan_batch=plan_batch,
+        status__in=["pending", "running"],
+    ).update(status="superseded")
 
     # Create the run
     run = PPCFeasibilityRun.objects.create(
@@ -301,13 +420,15 @@ def run_feasibility(plan_batch_id):
         cap_flags = _capacity_check(run, plan_rows)
         mach_flags = _machine_loading(run, plan_rows)
         ebq_flags = _ebq_check(run, plan_rows)
+        mp_flags = _manpower_check(run, plan_rows)
 
-        total_flags = cap_flags + mach_flags + ebq_flags
+        total_flags = cap_flags + mach_flags + ebq_flags + mp_flags
 
         run.summary = {
             "capacity_flags": cap_flags,
             "machine_flags": mach_flags,
             "ebq_flags": ebq_flags,
+            "manpower_flags": mp_flags,
             "total_flags": total_flags,
             "plan_items": len(plan_rows),
             "plan_month": plan_month,

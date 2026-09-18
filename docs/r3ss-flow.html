@@ -1,0 +1,435 @@
+<title>R3SS Module Flow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --text: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --blue: #1e3a5f;
+    --blue-light: #dbeafe;
+    --accent: #2563eb;
+    --amber: #d97706;
+    --amber-bg: #fffbeb;
+    --green: #059669;
+    --green-bg: #ecfdf5;
+    --red: #dc2626;
+    --red-bg: #fef2f2;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --text: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --border: #334155;
+      --blue: #93c5fd;
+      --blue-light: #1e3a5f;
+      --accent: #60a5fa;
+      --amber: #fbbf24;
+      --amber-bg: #292524;
+      --green: #34d399;
+      --green-bg: #1a2e23;
+      --red: #f87171;
+      --red-bg: #2d1f1f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --text: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --border: #334155;
+    --blue: #93c5fd;
+    --blue-light: #1e3a5f;
+    --accent: #60a5fa;
+    --amber: #fbbf24;
+    --amber-bg: #292524;
+    --green: #34d399;
+    --green-bg: #1a2e23;
+    --red: #f87171;
+    --red-bg: #2d1f1f;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.55;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 20px 64px;
+  }
+  h1 { font-size: 1.75rem; font-weight: 800; color: var(--blue); margin: 0 0 4px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-secondary); font-size: 0.875rem; margin: 0 0 32px; }
+  h2 { font-size: 1.125rem; font-weight: 700; color: var(--blue); margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--border); letter-spacing: -0.01em; }
+  h3 { font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin: 20px 0 8px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .panel p { margin: 0 0 12px; font-size: 0.875rem; color: var(--text-secondary); }
+  .panel p:last-child { margin-bottom: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+  th { text-align: left; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); padding: 6px 10px; border-bottom: 2px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .tbl-scroll { overflow-x: auto; }
+  code, .key { font-family: var(--mono); font-size: 0.75rem; background: var(--blue-light); color: var(--blue); padding: 1px 5px; border-radius: 4px; font-weight: 500; }
+  .freq-daily { display: inline-block; font-size: 0.6875rem; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--amber-bg); color: var(--amber); }
+  .freq-monthly { display: inline-block; font-size: 0.6875rem; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--green-bg); color: var(--green); }
+  .freq-once { display: inline-block; font-size: 0.6875rem; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--blue-light); color: var(--accent); }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* Pipeline flow */
+  .flow { display: flex; flex-direction: column; gap: 0; align-items: stretch; }
+  .flow-step {
+    display: flex; align-items: stretch; gap: 0;
+  }
+  .flow-num {
+    width: 36px; min-width: 36px; display: flex; flex-direction: column; align-items: center;
+  }
+  .flow-dot {
+    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.75rem; color: #fff; flex-shrink: 0;
+  }
+  .flow-line { width: 2px; flex: 1; min-height: 12px; }
+  .flow-content {
+    flex: 1; padding: 4px 0 16px 12px;
+  }
+  .flow-title { font-weight: 700; font-size: 0.875rem; margin-bottom: 2px; }
+  .flow-desc { font-size: 0.8125rem; color: var(--text-secondary); }
+  .flow-dot.upload { background: var(--accent); }
+  .flow-dot.compute { background: var(--amber); }
+  .flow-dot.sync { background: var(--green); }
+  .flow-dot.sheet { background: #7c3aed; }
+  .flow-line.upload { background: var(--accent); }
+  .flow-line.compute { background: var(--amber); }
+  .flow-line.sync { background: var(--green); }
+  .flow-line.sheet { background: #7c3aed; }
+
+  /* Checklist */
+  .check-list { list-style: none; padding: 0; margin: 0; }
+  .check-list li { padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem; display: flex; gap: 8px; align-items: flex-start; }
+  .check-list li:last-child { border-bottom: none; }
+  .badge-keep { display: inline-block; font-size: 0.6875rem; font-weight: 700; padding: 1px 7px; border-radius: 4px; background: var(--green-bg); color: var(--green); min-width: 52px; text-align: center; }
+  .badge-disable { display: inline-block; font-size: 0.6875rem; font-weight: 700; padding: 1px 7px; border-radius: 4px; background: var(--red-bg); color: var(--red); min-width: 52px; text-align: center; }
+  .badge-optional { display: inline-block; font-size: 0.6875rem; font-weight: 700; padding: 1px 7px; border-radius: 4px; background: var(--amber-bg); color: var(--amber); min-width: 52px; text-align: center; }
+
+  /* Summary tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; text-align: center; }
+  .tile-num { font-size: 1.5rem; font-weight: 800; color: var(--blue); }
+  .tile-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); font-weight: 600; }
+
+  .callout { background: var(--amber-bg); border-left: 3px solid var(--amber); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 0.8125rem; margin: 12px 0; }
+  .callout strong { color: var(--amber); }
+
+  @media (max-width: 640px) {
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+
+<h1>JCPL PPC — R3SS Module Flow</h1>
+<p class="subtitle">The single reference for what to upload, where it goes, and what to clean up. Sep 2026.</p>
+
+<div class="tiles">
+  <div class="tile"><div class="tile-num">9</div><div class="tile-label">Source Files</div></div>
+  <div class="tile"><div class="tile-num">1</div><div class="tile-label">Upload Screen</div></div>
+  <div class="tile"><div class="tile-num">1</div><div class="tile-label">n8n Workflow</div></div>
+  <div class="tile"><div class="tile-num">1</div><div class="tile-label">Google Sheet</div></div>
+  <div class="tile"><div class="tile-num">9</div><div class="tile-label">Sheet Tabs</div></div>
+</div>
+
+<!-- ────────────────── SECTION 1: THE 9 FILES ────────────────── -->
+<h2>① The 9 Source Files</h2>
+
+<div class="panel">
+  <h3>Monthly Masters — upload once at month start</h3>
+  <p>All uploaded from <code>/ppc-data/upload</code> screen. Auto-detected from filename.</p>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>#</th><th>File Name</th><th>Table Key</th><th>What it feeds</th><th>Freq</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><b>Product Group Mapping.xlsx</b></td><td><code>item_master</code></td><td>Item identity, description, site</td><td><span class="freq-monthly">Monthly</span></td></tr>
+        <tr><td>2</td><td><b>Monitoring.xlsx</b> (Family Group sheet)</td><td><code>family_hierarchy</code></td><td>Family, section, jolly code, green level fallback</td><td><span class="freq-monthly">Monthly</span></td></tr>
+        <tr><td>3</td><td><b>Green Level RM/CP/Packing.xlsx</b></td><td><code>stock_policy</code></td><td>Green level, red level, safety stock</td><td><span class="freq-monthly">Monthly</span></td></tr>
+        <tr><td>4</td><td><b>Monitoring.xlsx</b> (EBQ sheet)</td><td><code>batch_ebq</code></td><td>Economic batch quantity per family</td><td><span class="freq-monthly">Monthly</span></td></tr>
+        <tr><td>5</td><td><b>Lead Time Data.xlsx</b></td><td><code>lead_time</code></td><td>Manufacturing lead time per part</td><td><span class="freq-monthly">Monthly</span></td></tr>
+        <tr><td>6</td><td><b>T-Bolt BOM master.xlsx</b></td><td><code>part_engineering</code></td><td>Teeth, strokes, diameters, strip weight</td><td><span class="freq-monthly">Monthly</span></td></tr>
+        <tr><td>7</td><td><b>BOM_Item_Template.xlsx</b></td><td><code>bom_master</code></td><td>Bill of materials (for NO BOM control test)</td><td><span class="freq-monthly">Monthly</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <h3>Daily ERP Reports — upload every morning</h3>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>#</th><th>File Name</th><th>Table Key</th><th>What it feeds</th><th>Freq</th></tr></thead>
+      <tbody>
+        <tr><td>8</td><td><b>FG Stock Report.xlsx</b></td><td><code>erp_fg_stock</code></td><td>Opening + Receipt (DPR) + Issued (dispatch) + Closing — <em>all 4 in one file</em></td><td><span class="freq-daily">Daily</span></td></tr>
+        <tr><td>9</td><td><b>Sales Orders / SO Tracking.xlsx</b></td><td><code>erp_sales_orders</code></td><td>SO recheck, customer demand confirmation</td><td><span class="freq-daily">Daily</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <strong>Key insight:</strong> The FG Stock Report contains Opening, Receipt, Issued, AND Closing — so you do NOT need separate DPR, dispatch, or FG opening uploads. One file = four data points.
+  </div>
+</div>
+
+<div class="panel">
+  <h3>Demand — separate screen, once per month + weekly adjustments</h3>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Action</th><th>Screen</th><th>File</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td><b>Freeze initial demand</b></td><td><code>/ppc-data/demand</code></td><td>Sales Forecast (Aug Forecast 2026).xlsx</td><td><span class="freq-once">Month open</span></td></tr>
+        <tr><td>Add / reduce demand</td><td><code>/ppc-data/demand</code></td><td>Same forecast file with W1/W2 addition sheets</td><td><span class="freq-monthly">Weekly</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Demand freeze is immutable — once frozen, initial qty never changes. Additions/reductions are tracked as transactions.</p>
+</div>
+
+<!-- ────────────────── SECTION 2: THE PIPELINE ────────────────── -->
+<h2>② Complete Pipeline Flow</h2>
+
+<div class="panel">
+  <div class="flow">
+
+    <div class="flow-step">
+      <div class="flow-num"><div class="flow-dot upload">1</div><div class="flow-line upload"></div></div>
+      <div class="flow-content">
+        <div class="flow-title">Upload 7 Masters + 2 ERP files</div>
+        <div class="flow-desc">Portal screen <code>/ppc-data/upload</code> → auto-detects table_key → parses xlsx → stores in Django DB (PPCDataRow)</div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num"><div class="flow-dot upload">2</div><div class="flow-line upload"></div></div>
+      <div class="flow-content">
+        <div class="flow-title">Freeze demand from forecast</div>
+        <div class="flow-desc">Portal screen <code>/ppc-data/demand</code> → upload forecast → creates PPCDemandFreeze records (immutable)</div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num"><div class="flow-dot compute">3</div><div class="flow-line compute"></div></div>
+      <div class="flow-content">
+        <div class="flow-title">MPS Compute</div>
+        <div class="flow-desc">Portal screen <code>/ppc-data/mps</code> → click Compute → generates <code>mps_schedule</code> from masters + demand. <em>No file upload needed.</em></div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num"><div class="flow-dot compute">4</div><div class="flow-line compute"></div></div>
+      <div class="flow-content">
+        <div class="flow-title">R3SS Compute — the deliverable</div>
+        <div class="flow-desc">
+          Portal screen <code>/ppc-data/r3ss</code> → click Compute → runs the formula:<br>
+          <code style="background:var(--amber-bg);color:var(--amber)">to_plan = demand − opening + level</code><br>
+          Where level = green_level (normal) or 0.4 × green_level (when demand &lt; green)<br>
+          Then EBQ rounding → week bucketing → day spread → PLAN + _MAP + CONTROL
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num"><div class="flow-dot sync">5</div><div class="flow-line sync"></div></div>
+      <div class="flow-content">
+        <div class="flow-title">Auto sync to Google Sheet</div>
+        <div class="flow-desc">
+          Django POSTs 9 payloads to n8n webhook <code>ppc-r3ss</code> → n8n routes by tab → clears + writes to Google Sheet.<br>
+          Happens automatically after R3SS compute. HTTP 200 × 9 tabs.
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-step">
+      <div class="flow-num"><div class="flow-dot sheet">6</div></div>
+      <div class="flow-content">
+        <div class="flow-title">R3SS Google Sheet — ready for the team</div>
+        <div class="flow-desc">
+          Sheet ID: <code>1AHkBgdOLO4YZO6v…rpidRDU</code><br>
+          9 tabs populated. Planners read PLAN tab. _IMP tabs are lookup sources for formulas.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ────────────────── SECTION 3: GOOGLE SHEET TABS ────────────────── -->
+<h2>③ R3SS Google Sheet — 9 Tabs</h2>
+
+<div class="panel">
+  <p>One Google Sheet. Nine tabs. Tab names are <b>exact and case-sensitive</b>.</p>
+  <div class="tbl-scroll">
+    <table>
+      <thead><tr><th>Tab Name</th><th>Purpose</th><th>Rows</th><th>Key Columns</th></tr></thead>
+      <tbody>
+        <tr><td><code>PLAN</code></td><td><b>The deliverable</b> — day-wise production plan</td><td>52 items</td><td>item_code, demand, opening, to_plan, w1–w5, day columns, colour</td></tr>
+        <tr><td><code>_MAP</code></td><td>Calendar metadata</td><td>4 rows</td><td>dates, week_numbers, working (0/1), shifts</td></tr>
+        <tr><td><code>CONTROL</code></td><td>10 acceptance tests</td><td>10 rows</td><td>test_no, description, expected, actual, status</td></tr>
+        <tr><td><code>_IMP_MASTER</code></td><td>Joined master data</td><td>78 items</td><td>item_code, family, section, green_level, ebq, lead_time</td></tr>
+        <tr><td><code>_IMP_DEMAND</code></td><td>Demand transaction log</td><td>varies</td><td>item_code, txn_type, qty</td></tr>
+        <tr><td><code>_IMP_FG</code></td><td>Current FG stock (all 4 columns)</td><td>52 items</td><td>item_code, opening, receipt, issued, closing</td></tr>
+        <tr><td><code>_IMP_FG_OPEN</code></td><td>Month-start opening balance</td><td>52 items</td><td>item_code, opening</td></tr>
+        <tr><td><code>_IMP_DJR</code></td><td>Production entries this month</td><td>varies</td><td>item_code, date, qty</td></tr>
+        <tr><td><code>_IMP_INVOICE</code></td><td>Dispatch (issued) qty</td><td>52 items</td><td>item_code, qty</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ────────────────── SECTION 4: N8N CLEANUP ────────────────── -->
+<h2>④ n8n Workflows — What to Keep & Disable</h2>
+
+<div class="panel">
+  <p>You currently have <b>7 PPC webhooks + 6 S&OP webhooks = 13 workflows</b> configured. For R3SS only, you need <b>1</b>.</p>
+
+  <ul class="check-list">
+    <li>
+      <span class="badge-keep">KEEP</span>
+      <div>
+        <b>ppc-r3ss</b> — R3SS Sheet Sync<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Import <code>7-ppc-r3ss-sheet-sync-v3.json</code> → set Google credentials on all 18 nodes → activate</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">DISABLE</span>
+      <div>
+        <b>ppc-data</b> — PPC Data sheet sync<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Was pushing all uploads to a separate PPC Data Google Sheet. Not needed — R3SS sheet has everything.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">DISABLE</span>
+      <div>
+        <b>ppc-masters</b> — Masters sheet sync<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Was pushing L0 masters to a MASTERS Google Sheet. R3SS _IMP_MASTER tab replaces this.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">DISABLE</span>
+      <div>
+        <b>tcs-ion-erp</b> — TCS ION ERP sync<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Was pushing all 17 ERP reports to a TCS ION sheet. R3SS only needs FG Stock + Sales Orders.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">DISABLE</span>
+      <div>
+        <b>ppc-demand</b> — Demand sheet sync<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Was pushing demand txn to a DEMAND sheet. R3SS _IMP_DEMAND tab replaces this.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">DISABLE</span>
+      <div>
+        <b>ppc-pipeline-output</b> — Pipeline outputs (BOM, adherence)<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">L5-L8 pipeline. Not needed until those phases are built.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">DISABLE</span>
+      <div>
+        <b>ppc-planning</b> — RM CP Packing sync<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Legacy PPC Planning sheet. Will be replaced by L7 material module.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-optional">SEPARATE</span>
+      <div>
+        <b>sop-*</b> (6 workflows) — S&OP module<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Different module, different team. Keep/disable based on S&OP needs — doesn't affect R3SS.</span>
+      </div>
+    </li>
+  </ul>
+</div>
+
+<!-- ────────────────── SECTION 5: GOOGLE SHEETS CLEANUP ────────────────── -->
+<h2>⑤ Google Sheets — What to Keep & Disable</h2>
+
+<div class="panel">
+  <ul class="check-list">
+    <li>
+      <span class="badge-keep">KEEP</span>
+      <div>
+        <b>R3SS Sheet</b> — <code>1AHkBgdOLO4YZO6vBqVQHNPmlT-IwFygCf2O8rpidRDU</code><br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">The one sheet that matters. 9 tabs. Make sure all tab names exist (see table above).</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">ARCHIVE</span>
+      <div>
+        <b>MASTERS Sheet</b> — W1_01 through W1_17 tabs<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Replaced by _IMP_MASTER tab in R3SS sheet. Rename to "[ARCHIVED] MASTERS".</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">ARCHIVE</span>
+      <div>
+        <b>TCS ION Sheet</b> — 17 ERP report tabs<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Only FG Stock + Sales Orders matter. Both flow through R3SS _IMP_FG and _IMP_INVOICE.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">ARCHIVE</span>
+      <div>
+        <b>PPC Data Sheet</b> — mixed master/plan data<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Was a catch-all dump. Everything relevant is now in the R3SS sheet.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-disable">ARCHIVE</span>
+      <div>
+        <b>DEMAND Sheet</b> — demand transaction log<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Replaced by _IMP_DEMAND tab in R3SS sheet.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-optional">LATER</span>
+      <div>
+        <b>PPC Pipeline Sheet</b> — BOM explosion, shortages, adherence<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Needed when L5-L8 phases are built. Park for now.</span>
+      </div>
+    </li>
+    <li>
+      <span class="badge-optional">LATER</span>
+      <div>
+        <b>PPC Planning Sheet</b> — RM CP Packing requirement<br>
+        <span style="color:var(--text-secondary);font-size:0.75rem">Legacy format. Will be replaced by L7 material module output.</span>
+      </div>
+    </li>
+  </ul>
+</div>
+
+<!-- ────────────────── SECTION 6: SETUP CHECKLIST ────────────────── -->
+<h2>⑥ One-time Setup Checklist</h2>
+
+<div class="panel">
+  <ol style="padding-left:20px; font-size:0.875rem; line-height:1.8; margin:0;">
+    <li>Open R3SS Google Sheet → verify all <b>9 tab names</b> exist (exact, case-sensitive)</li>
+    <li>Go to n8n → import <code>docs/n8n/7-ppc-r3ss-sheet-sync-v3.json</code></li>
+    <li>Open the imported workflow → set <b>Google Sheets OAuth2 credential</b> on all 18 nodes (9 Clear + 9 Write)</li>
+    <li>Activate the v3 workflow</li>
+    <li>Deactivate old workflows: ppc-data, ppc-masters, tcs-ion-erp, ppc-demand, ppc-pipeline-output, ppc-planning</li>
+    <li>Test: Portal → PPC Data → R3SS → click Compute → check all 9 tabs populate in the sheet</li>
+  </ol>
+</div>
+
+<div class="panel" style="background: var(--green-bg); border-color: var(--green);">
+  <p style="color: var(--green); font-weight: 700; margin-bottom: 4px;">After setup: daily workflow for planners</p>
+  <p style="margin:0;">
+    <b>Morning:</b> Upload today's FG Stock Report → Upload SO Tracking (if changed) → Go to R3SS → click Compute → done.<br>
+    The sheet auto-updates. Planners open the PLAN tab and start their day.
+  </p>
+</div>

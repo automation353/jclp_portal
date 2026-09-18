@@ -122,6 +122,26 @@ def feasibility_resolve(request):
     if not reason_code:
         return Response({"detail": "reason_code is required."}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Validate reason_code against W1_17 (reason_codes master)
+    reason_batch = (
+        PPCUploadBatch.objects
+        .filter(table_key="reason_codes", is_current=True)
+        .order_by("-uploaded_at")
+        .first()
+    )
+    if reason_batch:
+        valid_codes = set()
+        for row in reason_batch.rows.values_list("data", flat=True):
+            code = str(row.get("code") or row.get("reason_code") or "").strip()
+            if code:
+                valid_codes.add(code.upper())
+        if valid_codes and reason_code.upper() not in valid_codes:
+            return Response(
+                {"detail": f"Invalid reason_code '{reason_code}'. "
+                 f"Valid codes from W1_17: {', '.join(sorted(valid_codes)[:20])}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
     try:
         flag = PPCCapacityFlag.objects.get(pk=flag_id)
     except PPCCapacityFlag.DoesNotExist:
@@ -220,6 +240,10 @@ def release_create(request):
     )
     next_num = (last.release_number + 1) if last else 1
 
+    # Generate lot number: JCPL-YYMM-NNN
+    yymm = run.plan_month[2:4] + run.plan_month[5:7]  # "2026-09" → "2609"
+    lot_number = f"JCPL-{yymm}-{next_num:03d}"
+
     plan_batch = run.plan_batch
     plan_rows = list(plan_batch.rows.values_list("data", flat=True))
 
@@ -270,6 +294,7 @@ def release_create(request):
         release = PPCRelease.objects.create(
             plan_month=run.plan_month,
             release_number=next_num,
+            lot_number=lot_number,
             feasibility_run=run,
             source_batch=plan_batch,
             snapshot_batch=snapshot_batch,
@@ -279,20 +304,30 @@ def release_create(request):
             summary=summary,
         )
 
+    # Sheet sync — push release snapshot (fire-and-forget)
+    sheet_sync = None
+    try:
+        from .sheet_sync import sync_upload_to_sheet
+        sheet_sync = sync_upload_to_sheet(snapshot_batch)
+    except Exception:
+        log.exception("Release sheet sync failed (non-blocking)")
+
     notify(
-        f"Plan RELEASED — {run.plan_month}#{next_num}",
+        f"Plan RELEASED — {lot_number}",
         f"{request.user.get_username()} released the plan for {run.plan_month} "
-        f"(release #{next_num}): {len(plan_rows)} items.",
+        f"(lot {lot_number}, release #{next_num}): {len(plan_rows)} items.",
     )
 
     return Response({
         "release_id": release.pk,
         "plan_month": release.plan_month,
         "release_number": release.release_number,
+        "lot_number": release.lot_number,
         "status": release.status,
         "row_count": release.row_count,
         "summary": release.summary,
         "released_at": release.released_at.isoformat(),
+        "sheet_sync": sheet_sync,
     }, status=status.HTTP_201_CREATED)
 
 
@@ -314,6 +349,7 @@ def release_list(request):
             "id": r.pk,
             "plan_month": r.plan_month,
             "release_number": r.release_number,
+            "lot_number": r.lot_number,
             "status": r.status,
             "row_count": r.row_count,
             "released_by": str(r.released_by) if r.released_by else None,
@@ -357,6 +393,7 @@ def release_detail(request, release_id):
             "id": release.pk,
             "plan_month": release.plan_month,
             "release_number": release.release_number,
+            "lot_number": release.lot_number,
             "status": release.status,
             "row_count": release.row_count,
             "released_by": str(release.released_by) if release.released_by else None,

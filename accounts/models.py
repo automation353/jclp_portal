@@ -48,6 +48,36 @@ class User(AbstractUser):
         return f"{full_name or self.username} — {self.get_role_display()}"
 
 
+class UserModuleAccess(models.Model):
+    """Which portal modules a user may access.
+
+    Super Admin accounts bypass this entirely — they always see everything.
+    For Admin accounts the sidebar, route guards, and API decorators all
+    consult this table.  The Super Admin's User-Management screen writes
+    rows here when ticking module checkboxes.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="module_access",
+    )
+    module_slug = models.CharField(
+        max_length=50,
+        help_text="Slug from portal.data.DEPARTMENTS, e.g. 'purchase', 'ppc'.",
+    )
+    granted_at = models.DateTimeField(auto_now_add=True)
+    granted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="module_grants",
+    )
+
+    class Meta:
+        unique_together = ("user", "module_slug")
+        ordering = ["module_slug"]
+
+    def __str__(self):
+        return f"{self.user.username} → {self.module_slug}"
+
+
 class LoginEvent(models.Model):
     """One row per successful sign-in / sign-out, written automatically by the
     signal handlers in accounts.signals — this is what the Super Admin's

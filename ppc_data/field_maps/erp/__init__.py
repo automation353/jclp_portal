@@ -11,6 +11,7 @@ from . import (
     dispatch,
     fg_ageing,
     fg_stock,
+    fg_stock_open,
     forecast,
     item_cost,
     item_master_erp,
@@ -31,6 +32,7 @@ _ALL_MODULES = [
     item_master_erp,    # #1
     bom_erp,            # #2
     fg_stock,           # #3
+    fg_stock_open,      # #3b  (month-open snapshot)
     cp_stock,           # #4
     rm_stock,           # #5
     pm_stock,           # #6

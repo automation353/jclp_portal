@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import RequireAuth from './components/RequireAuth'
+import RequireSuperAdmin from './components/RequireSuperAdmin'
 import Departments from './screens/Departments'
 import EBQ from './screens/EBQ'
 import Landing from './screens/Landing'
@@ -27,6 +28,10 @@ import RMRequirement from './screens/RMRequirement'
 import SAndOP from './screens/SAndOP'
 import SopDemandSupply from './screens/SopDemandSupply'
 import SopUpload from './screens/SopUpload'
+import SuperAdmin from './screens/SuperAdmin'
+import SuperAdminActivity from './screens/SuperAdminActivity'
+import SuperAdminUserForm from './screens/SuperAdminUserForm'
+import SuperAdminUsers from './screens/SuperAdminUsers'
 import UploadData from './screens/UploadData'
 
 export default function App() {
@@ -66,6 +71,13 @@ export default function App() {
         <Route path="/ppc-forecast" element={<RequireAuth><PPCForecast /></RequireAuth>} />
         <Route path="/mto-mts" element={<RequireAuth><MtoMts /></RequireAuth>} />
         <Route path="/mto-mts/changes" element={<RequireAuth><MtoMtsChanges /></RequireAuth>} />
+
+        {/* Super Admin panel — only super_admin role can access. */}
+        <Route path="/super-admin" element={<RequireSuperAdmin><SuperAdmin /></RequireSuperAdmin>} />
+        <Route path="/super-admin/users" element={<RequireSuperAdmin><SuperAdminUsers /></RequireSuperAdmin>} />
+        <Route path="/super-admin/users/new" element={<RequireSuperAdmin><SuperAdminUserForm /></RequireSuperAdmin>} />
+        <Route path="/super-admin/users/:id" element={<RequireSuperAdmin><SuperAdminUserForm /></RequireSuperAdmin>} />
+        <Route path="/super-admin/activity" element={<RequireSuperAdmin><SuperAdminActivity /></RequireSuperAdmin>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

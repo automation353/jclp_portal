@@ -290,6 +290,68 @@ def trigger_compute_append1():
         return {"attempted": True, "ok": False, "error": str(exc)}
 
 
+def _validate_append1_csv(text):
+    """Check that CSV text looks like valid Append1 data.
+
+    Returns (ok, reason) — ok=True means safe to save as snapshot.
+    Validates:
+      1. Has a header row containing "Item Code" (case-insensitive)
+      2. At least 40 columns (Append1 has 46)
+      3. At least 100 data rows with an item code
+    """
+    import csv as _csv
+    import io as _io
+
+    lines = text.strip().split("\n")
+    if len(lines) < 50:
+        return False, f"Too few lines ({len(lines)}), expected 100+"
+
+    reader = _csv.reader(_io.StringIO(text))
+    all_rows = list(reader)
+
+    # Find the header row (first 5 rows, look for "item code")
+    header_idx = None
+    for idx, row in enumerate(all_rows[:5]):
+        for cell in row:
+            if "item code" in cell.lower().replace("\n", " "):
+                header_idx = idx
+                break
+        if header_idx is not None:
+            break
+
+    if header_idx is None:
+        return False, "No header row with 'Item Code' found in first 5 rows"
+
+    headers = all_rows[header_idx]
+    col_count = len([h for h in headers if h and h.strip()])
+    if col_count < 40:
+        return False, (
+            f"Only {col_count} columns (expected 40+). "
+            f"Headers start with: {headers[:5]}"
+        )
+
+    # Count data rows that have a non-empty item code
+    item_code_col = None
+    for ci, h in enumerate(headers):
+        if "item code" in h.lower().replace("\n", " "):
+            item_code_col = ci
+            break
+
+    data_rows = 0
+    for row in all_rows[header_idx + 1:]:
+        if item_code_col is not None and item_code_col < len(row):
+            if row[item_code_col].strip():
+                data_rows += 1
+
+    if data_rows < 100:
+        return False, (
+            f"Only {data_rows} data rows with item codes (expected 100+). "
+            f"Data may be from wrong sheet tab."
+        )
+
+    return True, f"{data_rows} items, {col_count} columns — valid Append1"
+
+
 def pull_append1_snapshot(sheet_id=None, snapshot_path=None):
     """Fetch the Append1 tab from Google Sheet and save as local CSV.
 
@@ -297,8 +359,15 @@ def pull_append1_snapshot(sheet_id=None, snapshot_path=None):
     back so the dashboard serves up-to-date numbers without a manual
     snapshot replacement.
 
+    Validates the downloaded data before overwriting:
+      - Must have "Item Code" header
+      - Must have 40+ columns (Append1 has 46)
+      - Must have 100+ data rows
+    Keeps one .bak of the previous snapshot.
+
     Returns {"ok": True, "rows": N} on success.
     """
+    import shutil
     import ssl
     import urllib.request
 
@@ -326,18 +395,33 @@ def pull_append1_snapshot(sheet_id=None, snapshot_path=None):
             data = resp.read()
 
         text = data.decode("utf-8", errors="replace")
-        lines = text.strip().split("\n")
-        if len(lines) < 50:
-            msg = f"Too few rows ({len(lines)}), skipping snapshot update"
-            log.warning("pull_append1_snapshot: %s", msg)
-            return {"ok": False, "reason": msg}
 
+        # ── Validate before saving ──
+        valid, reason = _validate_append1_csv(text)
+        if not valid:
+            log.warning(
+                "pull_append1_snapshot: REJECTED — %s. "
+                "Existing snapshot preserved.", reason,
+            )
+            return {"ok": False, "reason": reason}
+
+        # ── Backup existing snapshot before overwriting ──
+        if os.path.isfile(snapshot_path):
+            bak_path = snapshot_path + ".bak"
+            try:
+                shutil.copy2(snapshot_path, bak_path)
+                log.info("Append1 snapshot backed up → %s", bak_path)
+            except Exception as bak_exc:
+                log.warning("Backup failed (proceeding anyway): %s", bak_exc)
+
+        # ── Write validated data ──
         with open(snapshot_path, "w", encoding="utf-8") as f:
             f.write(text)
 
+        lines = text.strip().split("\n")
         log.info(
-            "Append1 snapshot updated: %d data rows → %s",
-            len(lines) - 1, snapshot_path,
+            "Append1 snapshot updated: %s → %s",
+            reason, snapshot_path,
         )
         return {"ok": True, "rows": len(lines) - 1, "path": snapshot_path}
 

@@ -1,0 +1,191 @@
+{
+  "name": "1 — PPC Planning Sheet (3 Independent Tab Flows)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ppc-planning",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "wh-01",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 500],
+      "webhookId": "ppc-planning"
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── CP Req branch ──\nconst body = $input.first().json.body || $input.first().json;\nconst cpReq = body.cp_req || {};\nconst rows  = cpReq.rows || [];\nif (!rows.length) return [];          // nothing to write → skip this branch\nreturn [{ json: { rows, headers: cpReq.headers || [] } }];\n"
+      },
+      "id": "extract-cp",
+      "name": "Extract CP Req",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 200]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PLANNING_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "CP Req" }
+      },
+      "id": "clear-cp",
+      "name": "Clear CP Req",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [780, 200],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Read rows from the Extract node (Clear node doesn't carry them forward)\nconst rows = $('Extract CP Req').first().json.rows || [];\nif (!rows.length) return [];\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "split-cp",
+      "name": "Split CP Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 200]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PLANNING_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "CP Req" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-cp",
+      "name": "Write CP Req",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1300, 200],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── RM Req branch ──\nconst body = $input.first().json.body || $input.first().json;\nconst rmReq = body.rm_req || {};\nconst rows  = rmReq.rows || [];\nif (!rows.length) return [];\nreturn [{ json: { rows, headers: rmReq.headers || [] } }];\n"
+      },
+      "id": "extract-rm",
+      "name": "Extract RM Req",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 500]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PLANNING_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "RM Req" }
+      },
+      "id": "clear-rm",
+      "name": "Clear RM Req",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [780, 500],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Extract RM Req').first().json.rows || [];\nif (!rows.length) return [];\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "split-rm",
+      "name": "Split RM Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 500]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PLANNING_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "RM Req" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-rm",
+      "name": "Write RM Req",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1300, 500],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ── Quantity Sheet branch ──\nconst body = $input.first().json.body || $input.first().json;\nconst qty  = body.quantity_sheet || {};\nconst rows = qty.rows || [];\nif (!rows.length) return [];\nreturn [{ json: { rows, headers: qty.headers || [] } }];\n"
+      },
+      "id": "extract-qty",
+      "name": "Extract Qty Sheet",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 800]
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PLANNING_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Quantity Sheet" }
+      },
+      "id": "clear-qty",
+      "name": "Clear Qty Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [780, 800],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Extract Qty Sheet').first().json.rows || [];\nif (!rows.length) return [];\nreturn rows.map(r => ({ json: r }));\n"
+      },
+      "id": "split-qty",
+      "name": "Split Qty Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 800]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "PASTE_PPC_PLANNING_SHEET_ID" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Quantity Sheet" },
+        "columns": { "mappingMode": "autoMapInputData", "value": {} },
+        "options": {}
+      },
+      "id": "write-qty",
+      "name": "Write Qty Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1300, 800],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "PASTE_CREDENTIAL_ID", "name": "Google Sheets Account" } }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[
+        { "node": "Extract CP Req",    "type": "main", "index": 0 },
+        { "node": "Extract RM Req",    "type": "main", "index": 0 },
+        { "node": "Extract Qty Sheet", "type": "main", "index": 0 }
+      ]]
+    },
+    "Extract CP Req":    { "main": [[{ "node": "Clear CP Req",    "type": "main", "index": 0 }]] },
+    "Clear CP Req":      { "main": [[{ "node": "Split CP Rows",   "type": "main", "index": 0 }]] },
+    "Split CP Rows":     { "main": [[{ "node": "Write CP Req",    "type": "main", "index": 0 }]] },
+
+    "Extract RM Req":    { "main": [[{ "node": "Clear RM Req",    "type": "main", "index": 0 }]] },
+    "Clear RM Req":      { "main": [[{ "node": "Split RM Rows",   "type": "main", "index": 0 }]] },
+    "Split RM Rows":     { "main": [[{ "node": "Write RM Req",    "type": "main", "index": 0 }]] },
+
+    "Extract Qty Sheet": { "main": [[{ "node": "Clear Qty Sheet", "type": "main", "index": 0 }]] },
+    "Clear Qty Sheet":   { "main": [[{ "node": "Split Qty Rows",  "type": "main", "index": 0 }]] },
+    "Split Qty Rows":    { "main": [[{ "node": "Write Qty Sheet", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "PPC Planning" }, { "name": "Sheet Sync" }],
+  "meta": { "instanceId": "jollyclamps" },
+  "pinData": {},
+  "_comment": "POST /webhook/ppc-planning — 3 INDEPENDENT parallel flows. CP Req only touches 'CP Req' tab. RM Req only touches 'RM Req' tab. Qty Sheet only touches 'Quantity Sheet' tab. They never cross-clear. Replace PASTE_PPC_PLANNING_SHEET_ID (sheet from URL: 1jg4EFvWaRjwJ4l8tt0FqBM0Fy3sHT-0y6LrWhYizMQ0) and PASTE_CREDENTIAL_ID."
+}

@@ -50,7 +50,23 @@ async function request(path, { method = 'GET', body, formData } = {}) {
   }
 
   if (!response.ok) {
-    throw new ApiError(data?.detail || `Request failed (${response.status})`, response.status)
+    // DRF returns {"detail": "..."} for permission/auth errors, but field-level
+    // validation errors come as {"field": ["msg", ...], ...}.  Flatten both into
+    // a single readable string.
+    let message = ''
+    if (data) {
+      if (typeof data.detail === 'string') {
+        message = data.detail
+      } else if (typeof data === 'object') {
+        const parts = []
+        for (const [key, val] of Object.entries(data)) {
+          const msgs = Array.isArray(val) ? val.join(', ') : String(val)
+          parts.push(key === 'non_field_errors' ? msgs : `${key}: ${msgs}`)
+        }
+        message = parts.join(' · ')
+      }
+    }
+    throw new ApiError(message || `Request failed (${response.status})`, response.status)
   }
   return data
 }
@@ -180,7 +196,14 @@ export const api = {
   },
   ppcR3ssCurrent: (limit = 500, search = '', fields = '') =>
     request(`/ppc-data/r3ss/current/?limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}${fields ? `&fields=${fields}` : ''}`),
+  ppcR3ssFromSheet: (search = '') =>
+    request(`/ppc-data/r3ss/from-sheet/${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  ppcR3ssRecomputeSheet: () =>
+    request('/ppc-data/r3ss/recompute-sheet/', { method: 'POST', body: {} }),
   ppcR3ssSummary: () => request('/ppc-data/r3ss/summary/'),
+  ppcR3ssCompute: (month) =>
+    request('/ppc-data/r3ss/compute/', { method: 'POST', body: { month } }),
+  ppcR3ssControl: () => request('/ppc-data/r3ss/control/'),
   ppcR3ssDay: (date, section = '', limit = 500) =>
     request(`/ppc-data/r3ss/day/${date}/?limit=${limit}${section ? `&section=${encodeURIComponent(section)}` : ''}`),
 
@@ -256,5 +279,20 @@ export const api = {
     request(`/sop/uploads/${tableKey ? `?table_key=${tableKey}` : ''}`),
   sopTableData: (tableKey, limit = 200, search = '') =>
     request(`/sop/data/${tableKey}/?limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}`),
+  sopSnapshots: () =>
+    request('/sop/snapshots/'),
+  sopDashboardExcelUrl: (month = '') =>
+    `/api/sop/dashboard-excel/${month ? `?month=${month}` : ''}`,
   // Append1 is computed by Apps Script — triggered by n8n after each source sync.
+
+  // ---------------- Super Admin Panel ----------------
+  adminStats: () => request('/admin-panel/stats/'),
+  adminModules: () => request('/admin-panel/modules/'),
+  adminUsers: () => request('/admin-panel/users/'),
+  adminUserCreate: (data) => request('/admin-panel/users/', { method: 'POST', body: data }),
+  adminUserDetail: (id) => request(`/admin-panel/users/${id}/`),
+  adminUserUpdate: (id, data) => request(`/admin-panel/users/${id}/`, { method: 'PUT', body: data }),
+  adminUserToggle: (id) => request(`/admin-panel/users/${id}/toggle/`, { method: 'POST' }),
+  adminActivity: (user = '') =>
+    request(`/admin-panel/activity/${user ? `?user=${encodeURIComponent(user)}` : ''}`),
 }

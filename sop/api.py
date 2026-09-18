@@ -121,6 +121,14 @@ def _local_compute_and_save_snapshot():
         result = sync_append1(items, APPEND1_HEADERS, _KEY_ORDER)
         log.info("Local → Sheet sync: %s", result)
 
+        # Auto-save monthly archive
+        try:
+            from .archive import save_monthly_snapshot, freeze_past_months
+            freeze_past_months()
+            save_monthly_snapshot()
+        except Exception:
+            log.exception("Monthly snapshot auto-save failed (non-blocking)")
+
     except Exception:
         log.exception("_local_compute_and_save_snapshot failed")
 
@@ -288,6 +296,14 @@ def upload(request):
             if not snapshot_ok:
                 log.info("S&OP: sheet path incomplete for %s, computing locally", tk)
                 _local_compute_and_save_snapshot()
+
+            # Auto-save monthly archive after successful Append1 update
+            try:
+                from .archive import save_monthly_snapshot, freeze_past_months
+                freeze_past_months()   # lock any past-month snapshots
+                save_monthly_snapshot()
+            except Exception:
+                log.exception("Monthly snapshot auto-save failed (non-blocking)")
 
         except Exception:
             log.exception("S&OP bg sync failed for %s (non-blocking)", tk)
@@ -574,10 +590,13 @@ def _parse_append1_csv(text):
 
     Handles both the Google Sheet export format and the reference CSV
     (which has a title row before the header row).
+
+    Returns list of item dicts, or None with a warning log on failure.
     """
     reader = csv.reader(io.StringIO(text))
     all_rows = list(reader)
     if not all_rows:
+        log.warning("_parse_append1_csv: empty CSV text")
         return None
 
     # Find the header row — look for one containing "Item Code"
@@ -590,14 +609,40 @@ def _parse_append1_csv(text):
         if header_idx is not None:
             break
     if header_idx is None:
+        # Log what the first rows look like for debugging
+        preview = [all_rows[i][:5] for i in range(min(3, len(all_rows)))]
+        log.warning(
+            "_parse_append1_csv: no 'Item Code' header in first 5 rows. "
+            "Total rows: %d. First rows: %s — this is NOT Append1 data.",
+            len(all_rows), preview,
+        )
         return None
 
     raw_headers = all_rows[header_idx]
     # Map CSV columns to internal keys
     col_keys = []
+    unmapped = []
     for h in raw_headers:
         nh = _normalise_header(h)
-        col_keys.append(_match_col(nh))
+        matched = _match_col(nh)
+        col_keys.append(matched)
+        if not matched and h.strip():
+            unmapped.append(h.strip())
+
+    mapped_count = sum(1 for k in col_keys if k is not None)
+    log.info(
+        "_parse_append1_csv: header row %d, %d/%d columns mapped.%s",
+        header_idx, mapped_count, len(raw_headers),
+        f" Unmapped: {unmapped}" if unmapped else "",
+    )
+
+    # Sanity check: Append1 should have 40+ mapped columns
+    if mapped_count < 15:
+        log.warning(
+            "_parse_append1_csv: only %d columns mapped — likely wrong "
+            "data format. Headers: %s", mapped_count, raw_headers[:10],
+        )
+        return None
 
     items = []
     for row in all_rows[header_idx + 1:]:
@@ -636,7 +681,14 @@ def _parse_append1_csv(text):
         items.append(item)
 
     if len(items) < 10:
-        return None   # too few items — something went wrong
+        log.warning(
+            "_parse_append1_csv: only %d items parsed (need 10+). "
+            "Total CSV rows: %d, header at row %d.",
+            len(items), len(all_rows), header_idx,
+        )
+        return None
+
+    log.info("_parse_append1_csv: successfully parsed %d items", len(items))
     return items
 
 
@@ -670,6 +722,15 @@ def refresh_append1(request):
                 log.info("Manual refresh — snapshot pull: %s", snap)
             refresh = trigger_full_refresh()
             log.info("Manual refresh — summaryOnly: %s", refresh)
+
+            # Auto-save monthly archive
+            try:
+                from .archive import save_monthly_snapshot, freeze_past_months
+                freeze_past_months()
+                save_monthly_snapshot()
+            except Exception:
+                log.exception("Monthly snapshot auto-save failed (non-blocking)")
+
         except Exception:
             log.exception("Manual refresh failed (non-blocking)")
 
@@ -684,6 +745,257 @@ def refresh_append1(request):
     })
 
 
+def _build_append1_xlsx(csv_text, month_label):
+    """Build a formatted .xlsx workbook from Append1 CSV text.
+
+    Matches the Google Sheet Append1 styling:
+      - Title row (merged, navy background, white bold text)
+      - Header row (dark blue background, white bold text, filters)
+      - Alternating row colours
+      - Number formatting for quantities and ₹ values
+      - Column widths sized to content
+      - Frozen header pane
+    """
+    import io as _io
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    reader = csv.reader(_io.StringIO(csv_text))
+    all_rows = list(reader)
+    if len(all_rows) < 2:
+        return None
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Append1"
+
+    # ── Colours ──
+    navy_fill = PatternFill("solid", fgColor="1A3A5C")
+    header_fill = PatternFill("solid", fgColor="2C5F8A")
+    alt_fill = PatternFill("solid", fgColor="F0F5FA")
+    white_font = Font(name="Calibri", bold=True, color="FFFFFF", size=11)
+    title_font = Font(name="Calibri", bold=True, color="FFFFFF", size=13)
+    header_font = Font(name="Calibri", bold=True, color="FFFFFF", size=10)
+    data_font = Font(name="Calibri", size=10)
+    green_font = Font(name="Calibri", size=10, color="2E7D32")
+    red_font = Font(name="Calibri", size=10, color="C62828")
+    thin_border = Border(
+        left=Side(style="thin", color="D0D8E0"),
+        right=Side(style="thin", color="D0D8E0"),
+        top=Side(style="thin", color="D0D8E0"),
+        bottom=Side(style="thin", color="D0D8E0"),
+    )
+
+    num_cols = len(all_rows[1]) if len(all_rows) > 1 else len(all_rows[0])
+
+    # ── Row 1: Title row (merged) ──
+    title_text = all_rows[0][0] if all_rows[0][0].strip() else (
+        f"Sales+Ops Demand Supply — Append1 ({month_label})"
+    )
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_cols)
+    title_cell = ws.cell(row=1, column=1, value=title_text)
+    title_cell.font = title_font
+    title_cell.fill = navy_fill
+    title_cell.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 30
+
+    # ── Row 2: Headers ──
+    # Find the header row (row with "Item Code")
+    header_idx = 0
+    for idx, row in enumerate(all_rows[:5]):
+        for cell in row:
+            if "item code" in cell.lower().replace("\n", " "):
+                header_idx = idx
+                break
+
+    headers = all_rows[header_idx]
+    for ci, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=ci, value=h.strip())
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(
+            horizontal="center", vertical="center", wrap_text=True,
+        )
+        cell.border = thin_border
+    ws.row_dimensions[2].height = 36
+
+    # ── Identify column types for formatting ──
+    # Text columns (no number formatting)
+    text_cols = set()
+    pct_cols = set()
+    rupee_cols = set()
+    for ci, h in enumerate(headers):
+        hl = h.lower()
+        if any(k in hl for k in ("item", "group", "class", "type", "tag",
+                                  "narrative", "insight", "capacity")):
+            text_cols.add(ci)
+        elif "%" in h or "accuracy" in hl:
+            pct_cols.add(ci)
+        elif "₹" in h or "value" in hl:
+            rupee_cols.add(ci)
+
+    # ── Data rows ──
+    for ri, row in enumerate(all_rows[header_idx + 1:], start=3):
+        is_alt = (ri % 2 == 1)
+        for ci, val in enumerate(row):
+            cell = ws.cell(row=ri, column=ci + 1)
+            cell.border = thin_border
+            cell.font = data_font
+
+            if is_alt:
+                cell.fill = alt_fill
+
+            if ci in text_cols:
+                cell.value = val.strip()
+                cell.alignment = Alignment(horizontal="left", wrap_text=True)
+            elif ci in pct_cols:
+                cell.value = val.strip()
+                cell.alignment = Alignment(horizontal="center")
+            else:
+                # Try to parse as number
+                raw = (val.replace(",", "").replace("–", "0")
+                       .replace("₹", "").replace("%", "")
+                       .replace("▼", "").replace("▲", "").strip())
+                try:
+                    num = float(raw) if raw else 0
+                    cell.value = num
+                    cell.alignment = Alignment(horizontal="right")
+                    if ci in rupee_cols:
+                        cell.number_format = '₹#,##0'
+                        # Red for negative ₹ values
+                        if num < 0:
+                            cell.font = red_font
+                    else:
+                        cell.number_format = '#,##0'
+                except ValueError:
+                    cell.value = val.strip()
+                    cell.alignment = Alignment(horizontal="left")
+
+    # ── Column widths ──
+    col_widths = {
+        0: 16, 1: 28, 2: 12,           # Item Group, Item Code, Product Class
+        14: 10,                          # Type MTS/MTO
+        28: 22, 29: 50,                  # Sales Insight Tag, Sales Narrative
+        30: 22, 31: 50, 32: 50,          # Ops tags + narratives
+    }
+    for ci in range(num_cols):
+        col_letter = get_column_letter(ci + 1)
+        if ci in col_widths:
+            ws.column_dimensions[col_letter].width = col_widths[ci]
+        elif ci in rupee_cols:
+            ws.column_dimensions[col_letter].width = 16
+        elif ci in pct_cols:
+            ws.column_dimensions[col_letter].width = 12
+        else:
+            ws.column_dimensions[col_letter].width = 14
+
+    # ── Freeze panes (header row visible while scrolling) ──
+    ws.freeze_panes = "A3"
+
+    # ── Auto-filter on header row ──
+    ws.auto_filter.ref = f"A2:{get_column_letter(num_cols)}2"
+
+    return wb
+
+
+@api_view(["GET"])
+def download_current_csv(request):
+    """Download the current (live) Append1 as formatted Excel.
+
+    GET /api/sop/append1-csv/
+    """
+    from django.http import HttpResponse
+
+    csv_path = os.path.join(os.path.dirname(__file__), "append1_snapshot.csv")
+    if not os.path.isfile(csv_path):
+        return Response(
+            {"error": "No Append1 data available"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    with open(csv_path, "r", encoding="utf-8") as f:
+        csv_text = f.read()
+
+    month_label = timezone.now().strftime("%Y-%m")
+    wb = _build_append1_xlsx(csv_text, month_label)
+    if not wb:
+        return Response(
+            {"error": "Failed to build Excel file"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    response = HttpResponse(
+        buf.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="Append1_{month_label}_live.xlsx"'
+    )
+    return response
+
+
+@api_view(["GET"])
+def snapshot_list(request):
+    """List available monthly snapshots.
+
+    GET /api/sop/snapshots/
+    Returns metadata for all archived months (no CSV or dashboard data).
+    """
+    from .archive import list_snapshots, is_current_month_fresh
+
+    snapshots = list_snapshots()
+    has_current, csv_month = is_current_month_fresh()
+
+    return Response({
+        "current_month": timezone.now().strftime("%Y-%m"),
+        "current_month_has_data": has_current,
+        "snapshots": snapshots,
+    })
+
+
+@api_view(["GET"])
+def snapshot_csv_download(request, year_month):
+    """Download the archived Append1 as formatted Excel.
+
+    GET /api/sop/snapshots/<year_month>/csv/
+    """
+    from django.http import HttpResponse
+
+    from .archive import get_snapshot
+
+    snap = get_snapshot(year_month)
+    if not snap:
+        return Response(
+            {"error": f"No snapshot found for {year_month}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    wb = _build_append1_xlsx(snap.append1_csv, year_month)
+    if not wb:
+        return Response(
+            {"error": "Failed to build Excel file"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    response = HttpResponse(
+        buf.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="Append1_{year_month}.xlsx"'
+    )
+    return response
+
+
 @api_view(["GET"])
 def demand_supply_overview(request):
     """Demand & Supply Visibility — overview dashboard data.
@@ -692,8 +1004,48 @@ def demand_supply_overview(request):
     replicating the Sales+Ops Dashboard.xlsm logic.
 
     Query params:
-      ?month=2026-09   — plan month (defaults to latest available)
+      ?month=2026-09   — serve archived month (returns stored dashboard_json)
     """
+    # ── Archive mode: serve a past month's snapshot ──
+    req_month = request.query_params.get("month")
+    if req_month:
+        from .archive import get_snapshot
+        snap = get_snapshot(req_month)
+        if snap:
+            data = snap.dashboard_json
+            data["_archive"] = {
+                "year_month": snap.year_month,
+                "archived_at": snap.updated_at.isoformat(),
+                "item_count": snap.item_count,
+                "frozen": snap.frozen,
+            }
+            return Response(data)
+        return Response(
+            {"has_data": False, "message": f"No data found for {req_month}"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # ── Check if current month has fresh data ──
+    from .archive import is_current_month_fresh, list_snapshots
+    has_current, csv_month = is_current_month_fresh()
+    current_month = timezone.now().strftime("%Y-%m")
+
+    if not has_current:
+        # Current month has no upload — tell frontend to show archive
+        snapshots = list_snapshots()
+        latest = snapshots[0]["year_month"] if snapshots else None
+        month_label = timezone.now().strftime("%B %Y")
+        return Response({
+            "has_data": False,
+            "current_month": current_month,
+            "message": (
+                f"{month_label} data has not been uploaded yet. "
+                f"Upload the source files to generate this month's dashboard."
+            ),
+            "latest_archive": latest,
+            "snapshots": snapshots,
+        })
+
     # ── Load data from each source ──
     dpr_rows = _get_current_rows("sop_dpr")
     forecast_rows = _get_current_rows("sop_forecast")
@@ -1609,11 +1961,22 @@ def demand_supply_overview(request):
         "shortfall_addl_demand": _exc_val_full("shortfall_addl_demand"),
         "production_surplus": _exc_val_full("production_surplus_qty"),
         "excess_opening": _exc_val_full("excess_opening_qty"),
-        "demand_reduction": _exc_val_full("demand_reduction_adj"),
+        "demand_reduction": _exc_val_full("demand_reduction_adj"),  # values negated below
         "excess_dispatched": _exc_val_full("excess_dispatched_qty"),
         "excess_dispatched_from_opstock": _exc_val_full("excess_dispatch_from_opstock"),
         "excess_dispatched_from_surplus": _exc_val_full("excess_dispatch_from_surplus"),
     }
+
+    # Demand Reduction is a "pullback" — negate ₹ values to match Excel
+    # convention (qty stays positive, value goes negative).
+    dr = exceptions_value["demand_reduction"]
+    for sub_key in ("total", "MTS", "MTO", "TBC"):
+        dr[sub_key]["value"] = -abs(dr[sub_key]["value"])
+    for seg in ("focus", "regular"):
+        if seg in dr:
+            for sub_key in ("total", "MTS", "MTO", "TBC"):
+                if sub_key in dr[seg]:
+                    dr[seg][sub_key]["value"] = -abs(dr[seg][sub_key]["value"])
 
     # ── INSIGHT ENGINE (Insight Logic Master — cols W, X, Y, Z, AA) ──
     # Each item gets: sales_tag (W), sales_narrative (X),
@@ -1892,7 +2255,7 @@ def demand_supply_overview(request):
         tb = type_breakdown[t]
         tb["items"] += 1
         tb["forecast"] += _num(i.get("original_forecast", 0))
-        tb["committed"] += _num(i.get("committed_forecast", 0))
+        tb["committed"] += _num(i.get("actual_sales", 0))
         tb["production"] += _num(i.get("actual_production", 0))
         tb["dispatch"] += _num(i.get("actual_dispatch", 0))
 
@@ -2086,6 +2449,32 @@ def demand_supply_overview(request):
         daemon=True,
     ).start()
 
+    # ── DEMAND VALUE (₹) — ASP-weighted ────────────────────────────────
+    # Reference rows 22-25: Original Forecast Value, Final Committed Value,
+    # Mix Uplift / (Compression).  Valued at Item-Group ASP.
+    from .append1 import ASP_TABLE
+
+    def _demand_val_sums(items_list):
+        orig = 0
+        committed = 0
+        for i in items_list:
+            asp = ASP_TABLE.get(i.get("item_group", ""), 0)
+            orig += _num(i.get("original_forecast", 0)) * asp
+            committed += _num(i.get("actual_sales", 0)) * asp
+        uplift = committed - orig
+        return {
+            "original_forecast_value": round(orig, 2),
+            "committed_demand_value": round(committed, 2),
+            "mix_uplift": round(uplift, 2),
+            "mix_uplift_pct": round(uplift / orig, 4) if orig else 0,
+        }
+
+    demand_value = {
+        "total": _demand_val_sums(all_items),
+        "focus": _demand_val_sums(focus_items),
+        "regular": _demand_val_sums(regular_items),
+    }
+
     return Response({
         "has_data": True,
         "uploads": upload_status,
@@ -2123,6 +2512,9 @@ def demand_supply_overview(request):
             },
         },
 
+        # DEMAND VALUE (₹) — ASP-weighted
+        "demand_value": demand_value,
+
         # EXCEPTIONS (each has total / focus / regular)
         "exceptions": exceptions_data,
 
@@ -2150,6 +2542,37 @@ def demand_supply_overview(request):
         "top10_free_inventory": top10_free_inv,
         "top10_below_green": top10_below_green,
     })
+
+
+@api_view(["GET"])
+def download_dashboard_excel(request):
+    """Download the Demand & Supply dashboard as a formatted Excel workbook.
+
+    GET /api/sop/dashboard-excel/
+    GET /api/sop/dashboard-excel/?month=2026-08
+    """
+    from django.http import HttpResponse
+    from .excel_export import dashboard_to_bytes
+
+    # Re-use demand_supply_overview to get the JSON — call it internally.
+    response = demand_supply_overview(request._request)
+    data = response.data
+    if not data.get("has_data", True):
+        return Response(
+            {"detail": data.get("message", "No data available for export.")},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    excel_bytes = dashboard_to_bytes(data)
+    month_tag = request.query_params.get("month") or timezone.now().strftime("%Y-%m")
+    filename = f"SOP_Dashboard_{month_tag}.xlsx"
+
+    resp = HttpResponse(
+        excel_bytes,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
 
 
 # NOTE: Append1 is now pushed from Django (demand_supply_overview) via

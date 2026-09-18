@@ -648,6 +648,15 @@ def compute_append1():
         # AP: Excess Dispatch Value (₹) = AB × ASP
         excess_dispatch_val = excess_dispatched * asp
 
+        # AQ: Excess Dispatched from Op Stock = MIN(AB, MAX(J - G, 0))
+        excess_from_opstock = min(excess_dispatched, max(opening_inventory - actual_sales_demand, 0))
+        # AR: Excess Dispatch from Surplus Production = AB - AQ
+        excess_from_surplus = excess_dispatched - excess_from_opstock
+        # AS: Excess Dispatch from Op Stock Value (₹) = AQ × ASP
+        excess_from_opstock_val = excess_from_opstock * asp
+        # AT: Excess Dispatch from Surplus Production Value (₹) = AR × ASP
+        excess_from_surplus_val = excess_from_surplus * asp
+
         # ── Assemble output row ──
         result.append({
             "item_group": item_group,
@@ -692,6 +701,10 @@ def compute_append1():
             "shortfall_additional_val": _fmt(shortfall_additional_val),
             "demand_reduction_val": _fmt(demand_reduction_val),
             "excess_dispatch_val": _fmt(excess_dispatch_val),
+            "excess_dispatch_from_opstock": _fmt(excess_from_opstock),
+            "excess_dispatch_from_surplus": _fmt(excess_from_surplus),
+            "excess_dispatch_opstock_val": _fmt(excess_from_opstock_val),
+            "excess_dispatch_surplus_val": _fmt(excess_from_surplus_val),
         })
 
     log.info("Append1: computed %d item rows", len(result))
@@ -742,6 +755,10 @@ APPEND1_HEADERS = [
     "Shortfall on Additional Demand (₹)",
     "Demand Reduction Adjustment (₹)",
     "Excess Dispatch Value (₹)",
+    "Excess Dispatched from Op Stock",
+    "Excess Dispatch from Surplus Production",
+    "Excess Dispatch from Op Stock Value (₹)",
+    "Excess Dispatch from Surplus Production Value (₹)",
 ]
 
 # Maps dict key → position in APPEND1_HEADERS
@@ -788,4 +805,8 @@ _KEY_ORDER = [
     "shortfall_additional_val",
     "demand_reduction_val",
     "excess_dispatch_val",
+    "excess_dispatch_from_opstock",
+    "excess_dispatch_from_surplus",
+    "excess_dispatch_opstock_val",
+    "excess_dispatch_surplus_val",
 ]

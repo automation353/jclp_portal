@@ -1,13 +1,20 @@
-"""REST endpoints for L3 MPS uploads.
+"""REST endpoints for L3 MPS uploads + compute.
 
   POST /api/ppc-data/mps/upload/       upload MPS schedule / history / calendar
+  POST /api/ppc-data/mps/compute/      run MPS NET_REQUIREMENT engine
   GET  /api/ppc-data/mps/current/      get current MPS schedule rows
   GET  /api/ppc-data/mps/summary/      MPS summary tiles (items, total plan qty)
+  GET  /api/ppc-data/mps/gate/         MPS gate check (demand frozen + items computed)
 
 The MPS Schedule Form is the central output of L3. It consumes:
   - L0 masters (item, BOM, capacity, EBQ, lead time)
   - L1 ERP feeds (FG stock, WIP, sales orders)
   - L2 frozen demand + transactions
+
+The compute engine (compute_mps.py) implements spec §3.3:
+  NET_REQUIREMENT = MAX(0, TOTAL_DEMAND + SAFETY_STOCK − FG − WIP − PRODUCED_MTD)
+  NET_REQUIREMENT = ROUNDUP(NET_REQUIREMENT / EBQ) × EBQ
+  Then bucketed into W1-W5 by lead time and calendar.
 
 Week buckets (W1-W5) are stored in the JSON data of each PPCDataRow.
 """
@@ -15,10 +22,11 @@ Week buckets (W1-W5) are stored in the JSON data of each PPCDataRow.
 import logging
 
 from django.db import transaction
+from django.utils import timezone
 from portal.notify import notify
 from rest_framework import status
 from rest_framework.decorators import api_view, parser_classes
-from rest_framework.parsers import MultiPartParser
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .api import _store_file
@@ -151,6 +159,123 @@ def mps_upload(request):
     return Response(payload, status=status.HTTP_201_CREATED)
 
 
+@api_view(["POST"])
+@parser_classes([JSONParser, MultiPartParser])
+def mps_compute(request):
+    """Run the MPS NET_REQUIREMENT engine for a given month.
+
+    Spec §3.3: computes net requirement per item from demand, stock,
+    WIP, safety stock, and EBQ, then buckets into W1-W5.
+
+    JSON body:
+      {"month": "2026-09"}
+
+    Requires:
+      - Frozen demand for the month (L2)
+      - FG stock data (L1 ERP)
+      - Masters loaded (L0): family_hierarchy, batch_ebq, lead_time, stock_policy
+    """
+    month = (request.data.get("month") or "").strip()
+    if not month or len(month) != 7:
+        # Default to current month
+        month = timezone.now().strftime("%Y-%m")
+
+    from .compute_mps import compute_mps
+
+    try:
+        result = compute_mps(month, user=request.user)
+    except Exception as exc:
+        log.exception("MPS compute failed for month=%s", month)
+        return Response(
+            {"detail": f"MPS compute failed: {exc}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    if result.get("ok"):
+        notify(
+            f"MPS computed — {month}",
+            f"{request.user.get_username()} ran MPS compute for {month}: "
+            f"{result['items_computed']} items, "
+            f"net req = {result['total_net_requirement']:,.0f}, "
+            f"{result['gate_failures']} gate failures.",
+        )
+        return Response(result, status=status.HTTP_201_CREATED)
+    else:
+        return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+def mps_gate(request):
+    """MPS gate check — are all prerequisites met for the plan?
+
+    Checks:
+      1. Demand is frozen for the month
+      2. MPS schedule has been computed
+      3. W1+W2+W3+W4+W5 = NET_REQUIREMENT for every part (zero gate failures)
+    """
+    from .field_maps.helpers import num0
+
+    month = request.GET.get("month", "").strip()
+    if not month:
+        month = timezone.now().strftime("%Y-%m")
+
+    checks = []
+
+    # Check 1: demand frozen
+    from .models import PPCDemandFreeze
+    demand_count = PPCDemandFreeze.objects.filter(month=month).count()
+    checks.append({
+        "check": "demand_frozen",
+        "status": "PASS" if demand_count > 0 else "BLOCKED",
+        "detail": f"{demand_count} items frozen for {month}",
+    })
+
+    # Check 2: MPS computed
+    batch = (
+        PPCUploadBatch.objects
+        .filter(table_key="mps_schedule", is_current=True)
+        .order_by("-uploaded_at")
+        .first()
+    )
+    has_mps = batch is not None
+    checks.append({
+        "check": "mps_computed",
+        "status": "PASS" if has_mps else "BLOCKED",
+        "detail": (
+            f"Batch #{batch.id}, {batch.row_count} items"
+            if has_mps else "No MPS schedule computed yet"
+        ),
+    })
+
+    # Check 3: week bucket gate (W1+...+W5 = NET_REQ for all parts)
+    gate_failures = 0
+    if has_mps:
+        rows = list(batch.rows.values_list("data", flat=True))
+        for r in rows:
+            net_req = num0(r.get("net_requirement"))
+            w_sum = sum(num0(r.get(f"w{i}_qty")) for i in range(1, 6))
+            if abs(w_sum - net_req) > 0.01:
+                gate_failures += 1
+
+        checks.append({
+            "check": "week_bucket_gate",
+            "status": "PASS" if gate_failures == 0 else "FAIL",
+            "detail": (
+                "All items: W1+W2+W3+W4+W5 = NET_REQUIREMENT"
+                if gate_failures == 0
+                else f"{gate_failures} items fail: W1+...+W5 ≠ NET_REQUIREMENT"
+            ),
+        })
+
+    all_pass = all(c["status"] == "PASS" for c in checks)
+
+    return Response({
+        "month": month,
+        "gate": "PASS" if all_pass else "BLOCKED",
+        "checks": checks,
+    })
+
+
 @api_view(["GET"])
 def mps_current(request):
     """Get current MPS schedule rows.
@@ -184,6 +309,16 @@ def mps_current(request):
     search = request.GET.get("search", "").strip()
     if search:
         rows_qs = rows_qs.filter(data__icontains=search)
+
+    # Section filter (G19 fix — was documented but not implemented)
+    section = request.GET.get("section", "").strip()
+    if section:
+        rows_qs = rows_qs.filter(data__section__icontains=section)
+
+    # Category filter (MTO/MTS)
+    category = request.GET.get("category", "").strip()
+    if category:
+        rows_qs = rows_qs.filter(data__category__icontains=category)
 
     rows = list(rows_qs[:limit].values_list("sr_no", "data"))
 

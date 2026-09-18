@@ -17,20 +17,15 @@ function fmtD(n) {
 }
 
 function fmtCr(n) {
-  if (n == null || isNaN(n) || n === 0) return '₹0'
-  const abs = Math.abs(n)
+  if (n == null || isNaN(n) || n === 0) return '₹ 0'
   const sign = n < 0 ? '-' : ''
-  if (abs >= 1e7) return `${sign}₹${(abs / 1e7).toFixed(2)} Cr`
-  if (abs >= 1e5) return `${sign}₹${(abs / 1e5).toFixed(2)} L`
-  return `${sign}₹${Number(abs).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+  return `${sign}₹ ${Number(Math.abs(n)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
 function fmtV(n) {
-  if (!n || n === 0) return '—'
-  const abs = Math.abs(n)
-  if (abs >= 1e7) return '₹' + (abs / 1e7).toFixed(1) + ' Cr'
-  if (abs >= 1e5) return '₹' + (abs / 1e5).toFixed(1) + ' L'
-  return '₹' + Number(abs).toLocaleString('en-IN', { maximumFractionDigits: 0 })
+  if (!n || n === 0) return '–'
+  const sign = n < 0 ? '-' : ''
+  return `${sign}₹ ${Number(Math.abs(n)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
 
@@ -53,7 +48,7 @@ function SectionBar({ bg, children, columns }) {
   return (
     <tr style={{ background: bg }}>
       <td
-        colSpan={columns ? undefined : 99}
+        colSpan={columns ? (5 - columns.length) : 99}
         style={{
           color: C.hdrText, fontWeight: 800, fontSize: 13,
           padding: '8px 14px', letterSpacing: '.02em',
@@ -91,16 +86,30 @@ export default function SopDemandSupply() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [snapshots, setSnapshots] = useState([])
+  const [selectedMonth, setSelectedMonth] = useState('')  // '' = live/current
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    api.sopSnapshots()
+      .then(r => setSnapshots(r.snapshots || []))
+      .catch(() => {})
+  }, [])
 
-  function load() {
+  function load(month) {
     setLoading(true)
     setError('')
-    api.sopDemandSupply()
+    const m = month !== undefined ? month : selectedMonth
+    api.sopDemandSupply(m)
       .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
+  }
+
+  function onMonthChange(e) {
+    const m = e.target.value
+    setSelectedMonth(m)
+    load(m)
   }
 
   function refresh() {
@@ -150,6 +159,28 @@ export default function SopDemandSupply() {
 
         <div className="panel" style={{ padding: 0, overflow: 'hidden' }}>
 
+          {/* ── Archive badge (only for past/locked months) ── */}
+          {data?._archive && data._archive.frozen && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '10px 24px', background: '#fff8e1', borderBottom: '1px solid #f0e0a0',
+              fontSize: 13, color: '#7a6200',
+            }}>
+              <span style={{ fontSize: 18 }}>🔒</span>
+              <span>
+                <b>Viewing: {(() => {
+                  const [y, m] = data._archive.year_month.split('-')
+                  return new Date(y, m - 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+                })()}</b> (Locked)
+                {' · '}Saved: {new Date(data._archive.archived_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {' · '}{data._archive.item_count} items
+              </span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#7a6200', fontStyle: 'italic' }}>
+                View only — use ⬇ Append1 CSV button to download
+              </span>
+            </div>
+          )}
+
           {/* ── Page header (matches reference row 2-3) ── */}
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
@@ -162,7 +193,10 @@ export default function SopDemandSupply() {
               <p style={{
                 margin: '6px 0 0', fontSize: 13, fontStyle: 'italic', color: C.green,
               }}>
-                Live summary of all {v?.total_items || '—'} line items in Append1 — refreshes automatically as ERP data flows in.
+                {data?._archive && data._archive.frozen
+                  ? `🔒 Locked archive — ${data._archive.item_count} items (view only)`
+                  : `Live summary of all ${v?.total_items || '—'} line items in Append1 — refreshes automatically as ERP data flows in.`
+                }
               </p>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -170,33 +204,93 @@ export default function SopDemandSupply() {
               <div style={{ fontSize: 14, fontWeight: 700, color: '#333', marginTop: 2 }}>
                 As of {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')}
               </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
-                <button
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end', alignItems: 'center' }}>
+                {/* ── Month selector ── */}
+                {snapshots.length > 0 && (
+                  <select
+                    value={selectedMonth}
+                    onChange={onMonthChange}
+                    style={{
+                      fontSize: 12, padding: '6px 10px', borderRadius: 4,
+                      border: '1px solid #ccc', background: '#fff', cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">{(() => {
+                      const now = new Date()
+                      return now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+                    })()} (Live)</option>
+                    {snapshots.filter(s => s.frozen).map(s => {
+                      const [y, m] = s.year_month.split('-')
+                      const label = new Date(y, m - 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+                      return (
+                        <option key={s.year_month} value={s.year_month}>
+                          🔒 {label} ({s.item_count} items)
+                        </option>
+                      )
+                    })}
+                  </select>
+                )}
+                {/* Download button — always visible, URL matches selected month */}
+                <a
+                  href={selectedMonth
+                    ? `/api/sop/snapshots/${selectedMonth}/csv/`
+                    : '/api/sop/append1-csv/'
+                  }
+                  download
                   className="btn-upload"
-                  onClick={() => navigate('/s-and-op/demand-supply/upload')}
-                  style={{ fontSize: 12, padding: '6px 14px' }}
+                  style={{ fontSize: 12, padding: '6px 14px', background: '#1a5f7a', textDecoration: 'none', color: '#fff' }}
                 >
-                  📤 Upload Data
-                </button>
-                <button
-                  type="button"
+                  ⬇ Append1 Sheet
+                </a>
+                <a
+                  href={api.sopDashboardExcelUrl(selectedMonth)}
+                  download
                   className="btn-upload"
-                  onClick={load}
-                  disabled={loading || refreshing}
-                  style={{ background: 'var(--steel)', fontSize: 12, padding: '6px 14px' }}
+                  style={{ fontSize: 12, padding: '6px 14px', background: '#2e7d32', textDecoration: 'none', color: '#fff' }}
                 >
-                  {loading ? 'Loading…' : '⟳ Refresh'}
-                </button>
-                <button
-                  type="button"
-                  className="btn-upload"
-                  onClick={refresh}
-                  disabled={loading || refreshing}
-                  style={{ background: '#e67e22', fontSize: 12, padding: '6px 14px' }}
-                  title="Recompute Append1 from Google Sheet source data"
-                >
-                  {refreshing ? '⏳ Recomputing…' : '🔄 Recompute'}
-                </button>
+                  📥 Download Dashboard
+                </a>
+                {/* Upload/Refresh buttons — only for live (current month) */}
+                {!selectedMonth && (
+                  <>
+                    <button
+                      className="btn-upload"
+                      onClick={() => navigate('/s-and-op/demand-supply/upload')}
+                      style={{ fontSize: 12, padding: '6px 14px' }}
+                    >
+                      📤 Upload Data
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-upload"
+                      onClick={() => load('')}
+                      disabled={loading || refreshing}
+                      style={{ background: 'var(--steel)', fontSize: 12, padding: '6px 14px' }}
+                    >
+                      {loading ? 'Loading…' : '⟳ Refresh'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-upload"
+                      onClick={refresh}
+                      disabled={loading || refreshing}
+                      style={{ background: '#e67e22', fontSize: 12, padding: '6px 14px' }}
+                      title="Recompute Append1 from Google Sheet source data"
+                    >
+                      {refreshing ? '⏳ Recomputing…' : '🔄 Recompute'}
+                    </button>
+                  </>
+                )}
+                {/* Back to live button — when viewing archived month */}
+                {selectedMonth && (
+                  <button
+                    className="btn-upload"
+                    onClick={() => { setSelectedMonth(''); load('') }}
+                    style={{ fontSize: 12, padding: '6px 14px', background: C.green }}
+                  >
+                    ← Back to Live
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -232,9 +326,23 @@ export default function SopDemandSupply() {
               <p style={{ fontSize: '1.1rem', color: '#666', marginBottom: 20 }}>
                 {data.message || 'No data uploaded yet. Upload the 5 data files to power this dashboard.'}
               </p>
-              <button className="btn-upload" onClick={() => navigate('/s-and-op/demand-supply/upload')}>
-                📤 Upload Data Files
-              </button>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button className="btn-upload" onClick={() => navigate('/s-and-op/demand-supply/upload')}>
+                  📤 Upload Data Files
+                </button>
+                {data.latest_archive && (
+                  <button
+                    className="btn-upload"
+                    style={{ background: '#5d5a1e' }}
+                    onClick={() => { setSelectedMonth(data.latest_archive); load(data.latest_archive) }}
+                  >
+                    📁 View {(() => {
+                      const [y, m] = data.latest_archive.split('-')
+                      return new Date(y, m - 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+                    })()} Dashboard
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -274,15 +382,21 @@ export default function SopDemandSupply() {
                   <SectionBar bg={C.navy} columns={['Total', 'Focus', 'Regular']}>
                     HEALTH RATIOS
                   </SectionBar>
-                  <PctRow label="Dispatch Fulfilment (Dispatch ÷ Committed)" t={h.dispatch_fulfilment} f={h.focus?.dispatch_fulfilment} r={h.regular?.dispatch_fulfilment} />
-                  <PctRow label="Forecast Accuracy (Hit Rate — within 10%)" t={h.forecast_accuracy} f={h.focus?.forecast_accuracy} r={h.regular?.forecast_accuracy} remark="-10% to +10%" />
-                  <PctRow label="Production Coverage (capped — surpluses can't mask shortfalls)" t={h.production_coverage} f={h.focus?.production_coverage} r={h.regular?.production_coverage} />
+                  <PctRow label="Dispatch Fulfilment (Dispatch ÷ Committed)" t={h.dispatch_fulfilment} f={h.focus?.dispatch_fulfilment} r={h.regular?.dispatch_fulfilment} threshold={100} />
+                  <PctRow label="Forecast Accuracy (Hit Rate — within 10%)" t={h.forecast_accuracy} f={h.focus?.forecast_accuracy} r={h.regular?.forecast_accuracy} remark="-10% to +10%" threshold={80} />
+                  <PctRow label="Production Coverage (capped — surpluses can't mask shortfalls)" t={h.production_coverage} f={h.focus?.production_coverage} r={h.regular?.production_coverage} threshold={70} />
+
+                  {/* spacer */}
+                  <tr><td colSpan={5} style={{ height: 12 }}></td></tr>
+
+                  {/* ═══ DEMAND VALUE (₹) ═══ */}
+                  <DemandValueSection dv={data?.demand_value} />
 
                   {/* spacer */}
                   <tr><td colSpan={5} style={{ height: 12 }}></td></tr>
 
                   {/* ═══ EXCEPTIONS — ITEM COUNTS ═══ */}
-                  <SectionBar bg={C.red} columns={['Count', 'Focus', 'Regular']}>
+                  <SectionBar bg={C.red} columns={['Count', 'Focus', 'Regular', '% of Items']}>
                     EXCEPTIONS — ITEM COUNTS
                   </SectionBar>
                   {/* sub-header with % of Items */}
@@ -354,8 +468,8 @@ export default function SopDemandSupply() {
                     columns={[
                       { key: 'committed', label: 'Committed' },
                       { key: 'dispatch', label: 'Dispatch' },
-                      { key: 'gap', label: 'Gap', color: C.redText },
-                      { key: 'closing_stock', label: 'Closing Stock' },
+                      { key: 'dispatch_pct', label: 'Dispatch %', color: C.green, fmt: v => v != null ? `${v}%` : '—' },
+                      { key: 'gap', label: 'Dispatch Gap', color: C.redText },
                     ]}
                   />
 
@@ -371,6 +485,7 @@ export default function SopDemandSupply() {
                       { key: 'closing', label: 'Closing Inv' },
                       { key: 'green_level', label: 'Green Level' },
                       { key: 'free_inv', label: 'Free Inv', color: C.green },
+                      { key: 'x_green', label: 'x Green', fmt: v => v > 0 ? `${v}x` : '—' },
                     ]}
                   />
 
@@ -394,9 +509,6 @@ export default function SopDemandSupply() {
 
                   {/* ═══ EXCEPTIONS — Qty & ₹ VALUE ═══ */}
                   <ExceptionsValueSection ev={ev} />
-
-                  {/* ═══ FINANCIAL IMPACT ═══ */}
-                  <FinancialSection fi={fi} totalItems={v.total_items} />
 
                 </tbody>
               </table>
@@ -438,21 +550,28 @@ function VRow({ label: lbl, t, f, r, bold, neg }) {
 }
 
 /* Health % row — green percentages */
-function PctRow({ label: lbl, t, f, r, remark }) {
+function PctRow({ label: lbl, t, f, r, remark, threshold }) {
+  // Color each value individually: green if ≥ threshold, red if below
+  const pctColor = (v) => {
+    const n = parseFloat(v) || 0
+    if (threshold == null) return C.green          // no threshold → default green
+    return n >= threshold ? C.green : C.redText
+  }
   const labelS = {
-    color: C.green, fontWeight: 500, padding: '5px 14px', fontSize: 13,
+    fontWeight: 500, padding: '5px 14px', fontSize: 13,
     borderBottom: '1px solid #f0f0f0',
   }
-  const pctS = {
+  const pctCell = (v) => ({
     ...R, padding: '5px 14px', fontWeight: 700, fontSize: 13,
-    color: C.green, borderBottom: '1px solid #f0f0f0',
-  }
+    color: pctColor(v), borderBottom: '1px solid #f0f0f0',
+  })
   return (
     <tr>
-      <td style={labelS} colSpan={2}>{lbl}</td>
-      <td style={pctS}>{t || 0}%</td>
-      <td style={pctS}>{f || 0}%</td>
-      <td style={pctS}>{r || 0}%</td>
+      <td style={{ ...labelS, color: pctColor(t) }} colSpan={2}>{lbl}</td>
+      <td style={pctCell(t)}>{t || 0}%</td>
+      <td style={pctCell(f)}>{f || 0}%</td>
+      <td style={pctCell(r)}>{r || 0}%</td>
+      {remark && <td style={{ ...labelS, color: '#666', fontSize: 11 }}>{remark}</td>}
     </tr>
   )
 }
@@ -513,40 +632,57 @@ function TypeSection({ types, totalItems }) {
   return (
     <>
       <tr style={{ background: C.olive }}>
-        <td style={{ color: C.hdrText, fontWeight: 800, fontSize: 13, padding: '8px 14px' }} colSpan={1}>
+        <td colSpan={5} style={{
+          color: C.hdrText, fontWeight: 800, fontSize: 13,
+          padding: '8px 14px', letterSpacing: '.02em',
+        }}>
           TYPE BREAKDOWN — MTS / MTO / TBC
         </td>
-        <td style={hdrS}>Items</td>
-        <td style={hdrS}>Share %</td>
-        <td style={hdrS}>Forecast</td>
-        <td style={hdrS}>Production</td>
       </tr>
-      <tr style={{ background: '#f5f5f0' }}>
-        <td style={{ fontWeight: 700, fontSize: 11, padding: '4px 14px', color: C.muted }}>Type</td>
-        <td style={{ ...R, fontSize: 11, padding: '4px 10px', color: C.muted, fontWeight: 700 }}></td>
-        <td style={{ ...R, fontSize: 11, padding: '4px 10px', color: C.muted, fontWeight: 700 }}></td>
-        <td style={{ ...R, fontSize: 11, padding: '4px 10px', color: C.muted, fontWeight: 700 }}>Committed</td>
-        <td style={{ ...R, fontSize: 11, padding: '4px 10px', color: C.muted, fontWeight: 700 }}>Dispatch</td>
-      </tr>
-      {types.map((t, i) => {
-        const isTBC = t.type === 'TBC'
-        const color = isTBC ? C.redText : undefined
-        return (
-          <tr key={i}>
-            <td style={{ ...labelS, color }}>{typeLabels[t.type] || t.type}</td>
-            <td style={{ ...numS, color }}>{fmt(t.items)}</td>
-            <td style={{ ...numS, color }}>{t.share_pct}%</td>
-            <td style={{ ...numS, color }}>{fmt(t.forecast)}</td>
-            <td style={{ ...numS, color }}>{fmt(t.dispatch)}</td>
-          </tr>
-        )
-      })}
-      <tr style={{ background: '#f5f8ff' }}>
-        <td style={{ ...labelS, fontWeight: 800 }}>Total</td>
-        <td style={{ ...numS, fontWeight: 800 }}>{fmt(totals.items)}</td>
-        <td style={{ ...numS, fontWeight: 800 }}>100.0%</td>
-        <td style={{ ...numS, fontWeight: 800 }}>{fmt(totals.forecast)}</td>
-        <td style={{ ...numS, fontWeight: 800 }}>{fmt(totals.dispatch)}</td>
+      <tr>
+        <td colSpan={5} style={{ padding: 0 }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 650 }}>
+              <thead>
+                <tr style={{ background: '#f5f5f0' }}>
+                  <th style={{ ...hdrS, textAlign: 'left', color: '#333' }}>Type</th>
+                  <th style={{ ...hdrS, color: '#333' }}>Items</th>
+                  <th style={{ ...hdrS, color: '#333' }}>Share %</th>
+                  <th style={{ ...hdrS, color: '#333' }}>Forecast</th>
+                  <th style={{ ...hdrS, color: '#333' }}>Committed</th>
+                  <th style={{ ...hdrS, color: '#333' }}>Production</th>
+                  <th style={{ ...hdrS, color: '#333' }}>Dispatch</th>
+                </tr>
+              </thead>
+              <tbody>
+                {types.map((t, i) => {
+                  const isTBC = t.type === 'TBC'
+                  const color = isTBC ? C.redText : undefined
+                  return (
+                    <tr key={i}>
+                      <td style={{ ...labelS, color }}>{typeLabels[t.type] || t.type}</td>
+                      <td style={{ ...numS, color }}>{fmt(t.items)}</td>
+                      <td style={{ ...numS, color }}>{t.share_pct}%</td>
+                      <td style={{ ...numS, color }}>{fmt(t.forecast)}</td>
+                      <td style={{ ...numS, color }}>{fmt(t.committed)}</td>
+                      <td style={{ ...numS, color }}>{fmt(t.production)}</td>
+                      <td style={{ ...numS, color }}>{fmt(t.dispatch)}</td>
+                    </tr>
+                  )
+                })}
+                <tr style={{ background: '#f5f8ff' }}>
+                  <td style={{ ...labelS, fontWeight: 800 }}>Total</td>
+                  <td style={{ ...numS, fontWeight: 800 }}>{fmt(totals.items)}</td>
+                  <td style={{ ...numS, fontWeight: 800 }}>100.0%</td>
+                  <td style={{ ...numS, fontWeight: 800 }}>{fmt(totals.forecast)}</td>
+                  <td style={{ ...numS, fontWeight: 800 }}>{fmt(totals.committed)}</td>
+                  <td style={{ ...numS, fontWeight: 800 }}>{fmt(totals.production)}</td>
+                  <td style={{ ...numS, fontWeight: 800 }}>{fmt(totals.dispatch)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </td>
       </tr>
     </>
   )
@@ -655,7 +791,7 @@ function Top10Section({ title, bg, items, columns }) {
                         color: c.color || undefined,
                         fontWeight: c.color ? 800 : 600,
                       }}>
-                        {fmtD(item[c.key])}
+                        {c.fmt ? c.fmt(item[c.key]) : fmtD(item[c.key])}
                       </td>
                     ))}
                   </tr>
@@ -670,18 +806,65 @@ function Top10Section({ title, bg, items, columns }) {
 }
 
 
+/* ═══ DEMAND VALUE (₹) section ═══ */
+function DemandValueSection({ dv }) {
+  if (!dv) return null
+  const labelS = { color: C.green, fontWeight: 500, padding: '5px 14px', fontSize: 13, borderBottom: '1px solid #f0f0f0' }
+  const numS = { ...R, padding: '5px 14px', fontWeight: 700, fontSize: 13, borderBottom: '1px solid #f0f0f0' }
+  const pctS = { ...R, padding: '5px 14px', fontWeight: 600, fontSize: 13, color: C.muted, borderBottom: '1px solid #f0f0f0' }
+
+  const rows = [
+    { label: 'Original Forecast Value', key: 'original_forecast_value' },
+    { label: 'Committed Demand Value', key: 'committed_demand_value' },
+    { label: 'Mix Uplift / (Compression)', key: 'mix_uplift', isPct: true },
+  ]
+
+  return (
+    <>
+      <SectionBar bg={C.navy} columns={['Total', 'Focus', 'Regular']}>
+        DEMAND VALUE (₹) — ASP Weighted
+      </SectionBar>
+      {rows.map((r, i) => {
+        if (r.isPct) {
+          const uplT = dv.total?.mix_uplift ?? 0
+          const uplF = dv.focus?.mix_uplift ?? 0
+          const uplR = dv.regular?.mix_uplift ?? 0
+          const pctT = dv.total?.mix_uplift_pct ?? 0
+          const pctF = dv.focus?.mix_uplift_pct ?? 0
+          const pctR = dv.regular?.mix_uplift_pct ?? 0
+          const fmtPct = (v, p) => {
+            const sign = v >= 0 ? '+' : ''
+            return `${fmtCr(v)} (${sign}${(p * 100).toFixed(1)}%)`
+          }
+          return (
+            <tr key={i}>
+              <td style={labelS} colSpan={2}>{r.label}</td>
+              <td style={{ ...pctS, color: uplT >= 0 ? C.green : C.redText }}>{fmtPct(uplT, pctT)}</td>
+              <td style={{ ...pctS, color: uplF >= 0 ? C.green : C.redText }}>{fmtPct(uplF, pctF)}</td>
+              <td style={{ ...pctS, color: uplR >= 0 ? C.green : C.redText }}>{fmtPct(uplR, pctR)}</td>
+            </tr>
+          )
+        }
+        return (
+          <tr key={i}>
+            <td style={labelS} colSpan={2}>{r.label}</td>
+            <td style={numS}>{fmtCr(dv.total?.[r.key])}</td>
+            <td style={numS}>{fmtCr(dv.focus?.[r.key])}</td>
+            <td style={numS}>{fmtCr(dv.regular?.[r.key])}</td>
+          </tr>
+        )
+      })}
+    </>
+  )
+}
+
+
 /* ═══ EXCEPTIONS — Qty & ₹ VALUE section ═══ */
 function ExceptionsValueSection({ ev }) {
   if (!ev) return null
 
-  const buckets = [
-    { key: 'uncovered_shortfall', label: 'Uncovered Shortfall', desc: 'Total customer revenue at risk', highlight: true },
-    { key: 'production_driven', label: 'Production-Driven Shortfall', desc: 'Need exceeds opening + production' },
-    { key: 'dispatch_gap', label: 'Dispatch Gap', desc: 'Could ship from stock but didn\'t' },
-    { key: 'shortfall_addl_demand', label: 'Shortfall on Addl Demand', desc: 'Additional demand uncovered' },
-    { key: 'production_surplus', label: 'Production Surplus', desc: 'Produced more than committed need', surplus: true },
-    { key: 'excess_opening', label: 'Excess Opening Stock', desc: 'Opening beyond committed + safety', surplus: true },
-  ]
+  const [expanded, setExpanded] = React.useState({})
+  const toggle = (k) => setExpanded(prev => ({ ...prev, [k]: !prev[k] }))
 
   const hdrS = {
     color: C.hdrText, fontWeight: 700, fontSize: 11,
@@ -690,9 +873,116 @@ function ExceptionsValueSection({ ev }) {
   const numS = { ...R, padding: '5px 8px', fontWeight: 600, fontSize: 12, borderBottom: '1px solid #f0f0f0' }
   const valS = { ...numS, fontSize: 11, color: C.muted }
 
+  /* ▲/▼ arrow helpers — purely decorative, never touch the value */
+  const A_UP   = { color: C.green }    // ▲ green for surplus / positive
+  const A_DOWN = { color: C.redText }  // ▼ red for shortfall / reduction
+  const A_GREY = { color: '#999' }     // sub-row arrows (muted)
+
+  function arrow(style, n) {
+    if (n == null || isNaN(n) || n === 0) return ''
+    const sym = style === A_DOWN ? '▼' : '▲'
+    return <span style={style}>{sym} </span>
+  }
+
+  /* Render a parent bucket row (always visible) */
+  function bucketRow(d, label, { arrowStyle, highlight, key } = {}) {
+    if (!d) return null
+    const bg = highlight ? '#fff3e0' : undefined
+    const hasSubs = d.focus || d.regular
+    const isOpen = key && expanded[key]
+    return (
+      <tr key={key} style={{ background: bg }}>
+        <td style={{
+          padding: '6px 14px', fontSize: 12, fontWeight: 600,
+          borderBottom: '1px solid #f0f0f0', minWidth: 220,
+          cursor: hasSubs ? 'pointer' : 'default',
+        }} onClick={hasSubs ? () => toggle(key) : undefined}>
+          {hasSubs ? (isOpen ? '▾ ' : '▸ ') : '  '}{label}
+        </td>
+        <td style={{ ...numS, fontWeight: 700, color: arrowStyle?.color }}>{arrow(arrowStyle, d.total?.qty)}{fmtD(d.total?.qty)}</td>
+        <td style={{ ...valS, color: arrowStyle?.color }}>{arrow(arrowStyle, d.total?.value)}{fmtV(d.total?.value)}</td>
+        <td style={{ ...numS, borderLeft: '2px solid #e0e0e0', color: arrowStyle?.color }}>{arrow(arrowStyle, d.MTS?.qty)}{fmtD(d.MTS?.qty)}</td>
+        <td style={{ ...valS, color: arrowStyle?.color }}>{arrow(arrowStyle, d.MTS?.value)}{fmtV(d.MTS?.value)}</td>
+        <td style={{ ...numS, borderLeft: '2px solid #e0e0e0', color: arrowStyle?.color }}>{arrow(arrowStyle, d.MTO?.qty)}{fmtD(d.MTO?.qty)}</td>
+        <td style={{ ...valS, color: arrowStyle?.color }}>{arrow(arrowStyle, d.MTO?.value)}{fmtV(d.MTO?.value)}</td>
+        <td style={{ ...numS, borderLeft: '2px solid #e0e0e0', color: arrowStyle?.color }}>{arrow(arrowStyle, d.TBC?.qty)}{fmtD(d.TBC?.qty)}</td>
+        <td style={{ ...valS, color: arrowStyle?.color }}>{arrow(arrowStyle, d.TBC?.value)}{fmtV(d.TBC?.value)}</td>
+      </tr>
+    )
+  }
+
+  /* Focus / Regular sub-rows (shown when expanded) */
+  function focusRegular(d, prefix, arrowStyle) {
+    if (!d || !expanded[prefix]) return null
+    const ac = arrowStyle?.color  // muted tint for sub-rows
+    const subLabel = { padding: '4px 14px 4px 40px', fontSize: 11, fontWeight: 500, color: ac || '#777', borderBottom: '1px solid #f5f5f5', fontStyle: 'italic' }
+    const subNum = { ...R, padding: '4px 8px', fontWeight: 500, fontSize: 11, color: ac || '#777', borderBottom: '1px solid #f5f5f5' }
+    const subVal = { ...subNum, color: ac || '#999' }
+    const rows = []
+    if (d.focus) {
+      rows.push(
+        <tr key={prefix + '_f'} style={{ background: '#f8fafe' }}>
+          <td style={subLabel}>↳ Focus</td>
+          <td style={subNum}>{fmtD(d.focus.total?.qty)}</td>
+          <td style={subVal}>{fmtV(d.focus.total?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.focus.MTS?.qty)}</td>
+          <td style={subVal}>{fmtV(d.focus.MTS?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.focus.MTO?.qty)}</td>
+          <td style={subVal}>{fmtV(d.focus.MTO?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.focus.TBC?.qty)}</td>
+          <td style={subVal}>{fmtV(d.focus.TBC?.value)}</td>
+        </tr>
+      )
+    }
+    if (d.regular) {
+      rows.push(
+        <tr key={prefix + '_r'} style={{ background: '#fafaf5' }}>
+          <td style={subLabel}>↳ Regular</td>
+          <td style={subNum}>{fmtD(d.regular.total?.qty)}</td>
+          <td style={subVal}>{fmtV(d.regular.total?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.regular.MTS?.qty)}</td>
+          <td style={subVal}>{fmtV(d.regular.MTS?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.regular.MTO?.qty)}</td>
+          <td style={subVal}>{fmtV(d.regular.MTO?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.regular.TBC?.qty)}</td>
+          <td style={subVal}>{fmtV(d.regular.TBC?.value)}</td>
+        </tr>
+      )
+    }
+    return rows
+  }
+
+  /* Sub-component row (e.g. ├─ from Op Stock) with its own Focus/Regular */
+  function subRow(d, label, { arrowStyle, prefix } = {}) {
+    if (!d) return null
+    const hasSubs = d.focus || d.regular
+    const isOpen = prefix && expanded[prefix]
+    const subS = { padding: '4px 14px 4px 28px', fontSize: 11.5, fontWeight: 500, color: '#555', borderBottom: '1px solid #f0f0f0', cursor: hasSubs ? 'pointer' : 'default' }
+    const subNum = { ...R, padding: '4px 8px', fontWeight: 500, fontSize: 11.5, borderBottom: '1px solid #f0f0f0' }
+    const sv = { ...subNum, fontSize: 11, color: C.muted }
+    return (
+      <React.Fragment key={prefix}>
+        <tr style={{ background: '#fafcfa' }}>
+          <td style={subS} onClick={hasSubs ? () => toggle(prefix) : undefined}>
+            {hasSubs ? (isOpen ? '▾ ' : '▸ ') : '  '}{label}
+          </td>
+          <td style={{ ...subNum, color: arrowStyle?.color }}>{arrow(arrowStyle, d.total?.qty)}{fmtD(d.total?.qty)}</td>
+          <td style={{ ...sv, color: arrowStyle?.color }}>{arrow(arrowStyle, d.total?.value)}{fmtV(d.total?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0', color: arrowStyle?.color }}>{arrow(arrowStyle, d.MTS?.qty)}{fmtD(d.MTS?.qty)}</td>
+          <td style={{ ...sv, color: arrowStyle?.color }}>{arrow(arrowStyle, d.MTS?.value)}{fmtV(d.MTS?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0', color: arrowStyle?.color }}>{arrow(arrowStyle, d.MTO?.qty)}{fmtD(d.MTO?.qty)}</td>
+          <td style={{ ...sv, color: arrowStyle?.color }}>{arrow(arrowStyle, d.MTO?.value)}{fmtV(d.MTO?.value)}</td>
+          <td style={{ ...subNum, borderLeft: '2px solid #e0e0e0', color: arrowStyle?.color }}>{arrow(arrowStyle, d.TBC?.qty)}{fmtD(d.TBC?.qty)}</td>
+          <td style={{ ...sv, color: arrowStyle?.color }}>{arrow(arrowStyle, d.TBC?.value)}{fmtV(d.TBC?.value)}</td>
+        </tr>
+        {focusRegular(d, prefix, arrowStyle)}
+      </React.Fragment>
+    )
+  }
+
   return (
     <>
-      <tr style={{ background: '#2c2c2c' }}>
+      <tr style={{ background: C.red }}>
         <td colSpan={5} style={{
           color: C.hdrText, fontWeight: 800, fontSize: 13,
           padding: '8px 14px', letterSpacing: '.02em',
@@ -706,49 +996,78 @@ function ExceptionsValueSection({ ev }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
               <thead>
                 <tr style={{ background: '#f5f5f0' }}>
-                  <th style={{ ...hdrS, textAlign: 'left', color: '#333' }}>Bucket</th>
+                  <th style={{ ...hdrS, textAlign: 'left', color: '#333' }} rowSpan={2}>Bucket</th>
+                  <th style={{ ...hdrS, color: '#333', borderBottom: 'none' }} colSpan={2}>TOTAL</th>
+                  <th style={{ ...hdrS, color: '#1565c0', borderLeft: '2px solid #e0e0e0', borderBottom: 'none' }} colSpan={2}>MTS</th>
+                  <th style={{ ...hdrS, color: '#e65100', borderLeft: '2px solid #e0e0e0', borderBottom: 'none' }} colSpan={2}>MTO</th>
+                  <th style={{ ...hdrS, color: '#757575', borderLeft: '2px solid #e0e0e0', borderBottom: 'none' }} colSpan={2}>TBC</th>
+                </tr>
+                <tr style={{ background: '#f5f5f0' }}>
                   <th style={{ ...hdrS, color: '#333' }}>Qty</th>
                   <th style={{ ...hdrS, color: '#333' }}>₹ Value</th>
-                  <th style={{ ...hdrS, color: '#1565c0', borderLeft: '2px solid #e0e0e0' }}>MTS Qty</th>
-                  <th style={{ ...hdrS, color: '#1565c0' }}>MTS ₹</th>
-                  <th style={{ ...hdrS, color: '#e65100', borderLeft: '2px solid #e0e0e0' }}>MTO Qty</th>
-                  <th style={{ ...hdrS, color: '#e65100' }}>MTO ₹</th>
-                  <th style={{ ...hdrS, color: '#757575', borderLeft: '2px solid #e0e0e0' }}>TBC Qty</th>
-                  <th style={{ ...hdrS, color: '#757575' }}>TBC ₹</th>
+                  <th style={{ ...hdrS, color: '#1565c0', borderLeft: '2px solid #e0e0e0' }}>Qty</th>
+                  <th style={{ ...hdrS, color: '#1565c0' }}>₹ Value</th>
+                  <th style={{ ...hdrS, color: '#e65100', borderLeft: '2px solid #e0e0e0' }}>Qty</th>
+                  <th style={{ ...hdrS, color: '#e65100' }}>₹ Value</th>
+                  <th style={{ ...hdrS, color: '#757575', borderLeft: '2px solid #e0e0e0' }}>Qty</th>
+                  <th style={{ ...hdrS, color: '#757575' }}>₹ Value</th>
                 </tr>
               </thead>
               <tbody>
-                {buckets.map((b, i) => {
-                  const d = ev[b.key]
-                  if (!d) return null
-                  const rowBg = b.highlight ? '#fff3e0' : b.surplus ? '#f0faf0' : undefined
-                  const rowWeight = b.highlight ? 700 : 400
-                  return (
-                    <tr key={i} style={{ background: rowBg }}>
-                      <td style={{
-                        padding: '6px 14px', fontSize: 12, fontWeight: 600,
-                        borderBottom: '1px solid #f0f0f0', minWidth: 180,
-                      }}>
-                        <div>{b.highlight ? '▼ ' : ''}{b.label}</div>
-                        <div style={{ fontSize: 10, color: '#888', fontWeight: 400 }}>{b.desc}</div>
-                      </td>
-                      <td style={{ ...numS, fontWeight: 700 }}>{fmtD(d.total?.qty)}</td>
-                      <td style={valS}>{fmtV(d.total?.value)}</td>
-                      <td style={{ ...numS, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.MTS?.qty)}</td>
-                      <td style={valS}>{fmtV(d.MTS?.value)}</td>
-                      <td style={{ ...numS, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.MTO?.qty)}</td>
-                      <td style={valS}>{fmtV(d.MTO?.value)}</td>
-                      <td style={{ ...numS, borderLeft: '2px solid #e0e0e0' }}>{fmtD(d.TBC?.qty)}</td>
-                      <td style={valS}>{fmtV(d.TBC?.value)}</td>
-                    </tr>
-                  )
-                })}
+                {/* ── Surplus / positive side ── */}
+                {bucketRow(ev.production_surplus,
+                  'Production Surplus — Current Period (Working Capital from current build)',
+                  { arrowStyle: A_UP, key: 'ps' })}
+                {focusRegular(ev.production_surplus, 'ps', A_UP)}
+
+                {bucketRow(ev.excess_opening,
+                  'Excess Opening Stock — Above Demand+Safety (Legacy WC blocked)',
+                  { arrowStyle: A_DOWN, key: 'eo' })}
+                {focusRegular(ev.excess_opening, 'eo', A_DOWN)}
+
+                {bucketRow(ev.demand_reduction,
+                  'Demand Reduction Adjustment (Sales Pullback)',
+                  { arrowStyle: A_DOWN, key: 'dr' })}
+                {focusRegular(ev.demand_reduction, 'dr', A_DOWN)}
+
+                {bucketRow(ev.excess_dispatched,
+                  'Excess Dispatched',
+                  { arrowStyle: A_UP, key: 'ed' })}
+                {focusRegular(ev.excess_dispatched, 'ed', A_UP)}
+
+                {subRow(ev.excess_dispatched_from_opstock,
+                  '├─ Excess Dispatched from Op Stock',
+                  { arrowStyle: A_UP, prefix: 'ed_os' })}
+
+                {subRow(ev.excess_dispatched_from_surplus,
+                  '└─ Excess Dispatched from Surplus Production',
+                  { arrowStyle: A_UP, prefix: 'ed_sp' })}
+
+                {/* ── Shortfall / negative side ── */}
+                {bucketRow(ev.uncovered_shortfall,
+                  'Uncovered Shortfall  (Total customer revenue at risk)',
+                  { arrowStyle: A_DOWN, highlight: true, key: 'uc' })}
+                {focusRegular(ev.uncovered_shortfall, 'uc', A_DOWN)}
+
+                {subRow(ev.production_driven,
+                  '├─ Production-Driven Shortfall',
+                  { arrowStyle: A_DOWN, prefix: 'pd' })}
+
+                {subRow(ev.dispatch_gap,
+                  '├─ Dispatch Gap — Shippable from Stock',
+                  { arrowStyle: A_DOWN, prefix: 'dg' })}
+
+                {subRow(ev.shortfall_addl_demand,
+                  '└─ Shortfall on Additional Demand (Excluded from Ops)',
+                  { arrowStyle: A_DOWN, prefix: 'sad' })}
               </tbody>
             </table>
           </div>
           <div style={{ fontSize: 11, color: '#888', padding: '8px 14px', lineHeight: 1.5 }}>
-            Qty = SUM of Append1 exception columns; ₹ Value = rate-weighted.
-            MTS/MTO/TBC split via type column. Uncovered = Prod Shortfall + Dispatch Gap + Shortfall Addl Demand per item.
+            Qty = SUM of Append1 exception columns; ₹ Value = ASP-weighted (Append1 ₹ columns / ASP sheet).
+            MTS/MTO/TBC split via SUMIFS on Type. TOTAL = MTS + MTO + TBC.
+            Uncovered Shortfall (per item) = Production-Driven Shortfall + Dispatch Gap + Shortfall on Additional Demand;
+            column totals differ slightly as each bucket is floored at 0 per item before summing.
           </div>
         </td>
       </tr>
