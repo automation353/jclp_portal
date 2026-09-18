@@ -192,9 +192,11 @@ def read_r3ss_rows(tab_name="R3SS", timeout=30):
     return {"rows": out_rows, "row_count": len(out_rows), "plan_month": plan_month}
 
 
-def trigger_recompute(timeout=120):
+def trigger_recompute(timeout=540, force=False):
     """Ask the Apps Script to rebuild the R3SS tab from the 6 source tabs.
 
+    force=True clears the whole R3SS tab and rewrites it (drops stale rows);
+    otherwise the Apps Script upserts by ERP code.
     Returns {"ok": bool, ...}. Never raises.
     """
     url = _apps_script_url()
@@ -202,8 +204,8 @@ def trigger_recompute(timeout=120):
         return {"ok": False, "error": "JCLP_PPC_R3SS_APPS_SCRIPT_URL not set"}
     try:
         resp = requests.post(
-            url, json={"action": "computeR3SS"}, timeout=timeout,
-            allow_redirects=True,
+            url, json={"action": "computeR3SS", "force": bool(force)},
+            timeout=timeout, allow_redirects=True,
         )
         http_ok = 200 <= resp.status_code < 300
         # Apps Script always returns HTTP 200 — the real status is in the JSON

@@ -428,7 +428,8 @@ def r3ss_recompute_sheet(request):
     """
     from .r3ss_sheet_reader import read_r3ss_rows, trigger_recompute
 
-    compute = trigger_recompute()
+    force = bool(request.data.get("force"))
+    compute = trigger_recompute(force=force)
     if not compute.get("ok"):
         if compute.get("skipped"):
             # Guard tripped — some source tabs are still empty. Old R3SS data

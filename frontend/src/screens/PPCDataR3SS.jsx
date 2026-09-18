@@ -297,16 +297,19 @@ export default function PPCDataR3SS() {
 
   const [computeStep, setComputeStep] = useState('')
 
-  async function handleCompute() {
-    if (!confirm('Recompute R3SS?\nThis clears the current view and reloads the freshly computed R3SS tab from the Google Sheet.')) return
+  async function handleCompute(force = false) {
+    const msg = force
+      ? 'Force full rebuild?\nThis CLEARS the entire R3SS tab and rewrites it from scratch (removes any stale rows). Slower than a normal recompute.'
+      : 'Recompute R3SS?\nThis reloads the freshly computed R3SS tab from the Google Sheet.'
+    if (!confirm(msg)) return
     setComputing(true)
-    setComputeStep('Recomputing in Google Sheet…')
+    setComputeStep(force ? 'Full rebuild in Google Sheet…' : 'Recomputing in Google Sheet…')
     setError('')
     // Keep the current view visible while recomputing; it is replaced wholesale
     // only when the fresh R3SS tab comes back (no "empty" flash mid-compute).
     const timer = setTimeout(() => setComputeStep('Reading fresh R3SS tab…'), 8000)
     try {
-      const res = await api.ppcR3ssRecomputeSheet()
+      const res = await api.ppcR3ssRecomputeSheet(force)
       clearTimeout(timer)
       setData(res)
       setComputeStep(`Done — ${res.row_count} rows from Google Sheet`)
@@ -431,11 +434,16 @@ export default function PPCDataR3SS() {
             )}
           </div>
           <div className="head-buttons">
-            <button className="btn-upload" onClick={handleCompute} disabled={computing}
+            <button className="btn-upload" onClick={() => handleCompute(false)} disabled={computing}
               style={{ background: '#2e7d32', fontSize: 13, padding: '8px 14px' }}>
               {computing
                 ? <><span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.35)' }} />{computeStep || 'Computing…'}</>
                 : '⚡ Recompute'}
+            </button>
+            <button className="backbtn" onClick={() => handleCompute(true)} disabled={computing}
+              title="Clears the entire R3SS tab and rebuilds from scratch (removes stale rows)"
+              style={{ fontSize: 13, padding: '7px 12px', margin: 0 }}>
+              ⟳ Force Rebuild
             </button>
             <button
               className="backbtn"
@@ -497,7 +505,7 @@ export default function PPCDataR3SS() {
               The dashboard reads the R3SS tab from the connected Google Sheet.
               Make sure all 6 source tabs are uploaded, then click Recompute.
             </p>
-            <button className="btn-upload" onClick={handleCompute} disabled={computing}
+            <button className="btn-upload" onClick={() => handleCompute(false)} disabled={computing}
               style={{ background: '#2e7d32' }}>
               {computing ? (computeStep || 'Computing…') : '⚡ Recompute from Google Sheet'}
             </button>

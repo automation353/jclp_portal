@@ -198,8 +198,8 @@ export const api = {
     request(`/ppc-data/r3ss/current/?limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}${fields ? `&fields=${fields}` : ''}`),
   ppcR3ssFromSheet: (search = '') =>
     request(`/ppc-data/r3ss/from-sheet/${search ? `?search=${encodeURIComponent(search)}` : ''}`),
-  ppcR3ssRecomputeSheet: () =>
-    request('/ppc-data/r3ss/recompute-sheet/', { method: 'POST', body: {} }),
+  ppcR3ssRecomputeSheet: (force = false) =>
+    request('/ppc-data/r3ss/recompute-sheet/', { method: 'POST', body: { force } }),
   ppcR3ssSummary: () => request('/ppc-data/r3ss/summary/'),
   ppcR3ssCompute: (month) =>
     request('/ppc-data/r3ss/compute/', { method: 'POST', body: { month } }),
