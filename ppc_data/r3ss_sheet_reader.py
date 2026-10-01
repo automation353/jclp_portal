@@ -105,6 +105,59 @@ def _resolve_year(months, now_month, now_year):
     return year_for
 
 
+def _load_mto_mts_live(timeout=60):
+    """Build {jolly Item Code (upper) -> 'MTS'/'MTO'} from the MTO_MTS tab.
+
+    The MTO_MTS tab is computed in Django (see mto_mts_compute) and keyed by
+    MTS Key = Item Group|Item Code|Party, so one jolly code can appear under
+    several customer segments. We collapse them to one value per part code with
+    an MTS-if-any-segment-is-MTS rule (an item stocked for any customer is MTS).
+
+    Returns {} if the tab is missing/empty — callers then leave the existing
+    value untouched rather than blanking every row to NA.
+    """
+    sid = _sheet_id()
+    if not sid:
+        return {}
+    url = (
+        f"https://docs.google.com/spreadsheets/d/{sid}/gviz/tq"
+        f"?tqx=out:csv&headers=1&sheet={requests.utils.quote('MTO_MTS')}"
+    )
+    try:
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+    except Exception as exc:
+        log.warning("Could not read MTO_MTS tab for live status: %s", exc)
+        return {}
+
+    rows = list(csv.reader(io.StringIO(resp.text)))
+    if not rows:
+        return {}
+    norm = [h.strip().lower() for h in rows[0]]
+    try:
+        ic = norm.index("item code")
+        fs = norm.index("final status")
+    except ValueError:
+        log.warning("MTO_MTS tab missing Item Code / Final Status columns")
+        return {}
+
+    live = {}
+    for r in rows[1:]:
+        if ic >= len(r):
+            continue
+        code = (r[ic] or "").strip().upper()
+        if not code:
+            continue
+        status = (r[fs] or "").strip().upper() if fs < len(r) else ""
+        if status not in ("MTS", "MTO"):
+            continue
+        # MTS wins over MTO for the same part code.
+        if live.get(code) == "MTS":
+            continue
+        live[code] = status
+    return live
+
+
 def read_r3ss_rows(tab_name="R3SS", timeout=30):
     """Fetch the R3SS tab as a CSV export and map it to dashboard rows.
 
@@ -189,6 +242,16 @@ def read_r3ss_rows(tab_name="R3SS", timeout=30):
         sr += 1
         out_rows.append({"sr_no": sr, "data": data})
 
+    # Overlay the computed recent MTO/MTS status (from the MTO_MTS tab), matched
+    # by jolly code. Items with no recent sales show NA. If the MTO_MTS tab isn't
+    # present yet, leave whatever the R3SS tab already had.
+    live = _load_mto_mts_live()
+    if live:
+        for row in out_rows:
+            d = row["data"]
+            jolly = (d.get("jolly_code") or "").strip().upper()
+            d["mto_mts"] = live.get(jolly, "NA")
+
     return {"rows": out_rows, "row_count": len(out_rows), "plan_month": plan_month}
 
 
@@ -199,32 +262,43 @@ def trigger_recompute(timeout=540, force=False):
     otherwise the Apps Script upserts by ERP code.
     Returns {"ok": bool, ...}. Never raises.
     """
+    import time as _time
+
     url = _apps_script_url()
     if not url:
         return {"ok": False, "error": "JCLP_PPC_R3SS_APPS_SCRIPT_URL not set"}
-    try:
-        resp = requests.post(
-            url, json={"action": "computeR3SS", "force": bool(force)},
-            timeout=timeout, allow_redirects=True,
-        )
-        http_ok = 200 <= resp.status_code < 300
-        # Apps Script always returns HTTP 200 — the real status is in the JSON
-        # body (ok / skipped / reason). Parse it so a "waiting for tabs" skip
-        # is not mistaken for success.
-        body = {}
+
+    last = {"ok": False, "error": "no attempt"}
+    for attempt in range(1, 3):  # try twice — the first may hit a transient
         try:
-            body = resp.json()
-        except Exception:
+            resp = requests.post(
+                url, json={"action": "computeR3SS", "force": bool(force)},
+                timeout=timeout, allow_redirects=True,
+            )
+            http_ok = 200 <= resp.status_code < 300
+            # Apps Script always returns HTTP 200 — the real status is in the
+            # JSON body (ok / skipped / busy / reason).
             body = {}
-        ok = http_ok and bool(body.get("ok", http_ok))
-        return {
-            "ok": ok,
-            "skipped": bool(body.get("skipped")),
-            "reason": body.get("reason", ""),
-            "empty_tabs": body.get("empty_tabs", []),
-            "http_status": resp.status_code,
-            "body_preview": (resp.text or "")[:300],
-        }
-    except Exception as exc:
-        log.exception("R3SS Apps Script recompute failed")
-        return {"ok": False, "error": str(exc)}
+            try:
+                body = resp.json()
+            except Exception:
+                body = {}
+            last = {
+                "ok": http_ok and bool(body.get("ok", http_ok)),
+                "skipped": bool(body.get("skipped")),
+                "busy": bool(body.get("busy")),
+                "reason": body.get("reason", ""),
+                "empty_tabs": body.get("empty_tabs", []),
+                "http_status": resp.status_code,
+                "body_preview": (resp.text or "")[:300],
+            }
+        except Exception as exc:
+            log.exception("R3SS Apps Script recompute failed (attempt %d)", attempt)
+            last = {"ok": False, "error": str(exc)}
+
+        # Success or a definitive "waiting for tabs" skip — don't retry.
+        if last.get("ok") or last.get("skipped"):
+            return last
+        if attempt < 2:
+            _time.sleep(5)  # transient/concurrent collision — back off and retry
+    return last

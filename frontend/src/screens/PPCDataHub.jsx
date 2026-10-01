@@ -17,6 +17,13 @@ const PPC_PORTALS = [
     description: 'R3SS Production Plan — recompute, view, and sync to Google Sheet.',
     status: 'live',
   },
+  {
+    slug: 'ppc-data/rm-sourcing',
+    name: 'RM Sourcing',
+    icon: '🧱',
+    description: 'Raw material sourcing for the PPC pipeline.',
+    status: 'live',
+  },
 ]
 
 export default function PPCDataHub() {

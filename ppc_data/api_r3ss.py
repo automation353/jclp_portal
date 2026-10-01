@@ -422,15 +422,37 @@ def r3ss_from_sheet(request):
 def r3ss_recompute_sheet(request):
     """Recompute the R3SS tab in-sheet, then return the fresh rows.
 
-    Flow: trigger Apps Script computeR3SS (rebuilds the R3SS tab from the 6
-    source tabs), then re-read the tab. The old dashboard data is fully
-    replaced by whatever the sheet now holds.
+    Flow: (1) rebuild the MTO_MTS / EBQ Calc tabs in Django from the cached
+    register aggregates, (2) trigger Apps Script computeR3SS — which rebuilds
+    the R3SS tab AND (via its computeMtoMts hook) patches the R3SS MTO/MTS
+    column from the fresh MTO_MTS tab — (3) re-read the tab.
+
+    MTO/MTS runs first so the Apps Script hook reads the freshly-written data.
     """
     from .r3ss_sheet_reader import read_r3ss_rows, trigger_recompute
+
+    # (1) Rebuild MTO_MTS / EBQ Calc from the cached register aggregates first,
+    # so the R3SS compute's hook patches the column from current data.
+    mto_mts = None
+    try:
+        from .mto_mts_compute import compute_and_write
+        mto_mts = compute_and_write()
+        log.info("MTO/MTS recompute: %s",
+                 {k: v for k, v in mto_mts.items() if k != "writes"})
+    except Exception as exc:
+        log.exception("MTO/MTS recompute failed")
+        mto_mts = {"ok": False, "error": str(exc)}
 
     force = bool(request.data.get("force"))
     compute = trigger_recompute(force=force)
     if not compute.get("ok"):
+        if compute.get("busy"):
+            return Response(
+                {"detail": compute.get("reason")
+                    or "Another R3SS compute is running — try again in a moment.",
+                 "busy": True, "compute": compute},
+                status=status.HTTP_409_CONFLICT,
+            )
         if compute.get("skipped"):
             # Guard tripped — some source tabs are still empty. Old R3SS data
             # is left untouched in the sheet; tell the user what to finish.
@@ -468,6 +490,7 @@ def r3ss_recompute_sheet(request):
         "table_key": "r3ss_plan",
         "source": "google_sheet",
         "compute": compute,
+        "mto_mts": mto_mts,
         "row_count": result["row_count"],
         "plan_month": result["plan_month"],
         "rows": result["rows"],

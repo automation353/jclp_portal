@@ -21,6 +21,7 @@ import PPCFeasibility from './screens/PPCFeasibility'
 import PPCForecast from './screens/PPCForecast'
 import PPCMaterial from './screens/PPCMaterial'
 import PPCProduction from './screens/PPCProduction'
+import PPCRMSourcing from './screens/PPCRMSourcing'
 import Purchase from './screens/Purchase'
 import PurchaseDashboard from './screens/PurchaseDashboard'
 import PurchasePlanning from './screens/PurchasePlanning'
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/ppc-data/demand" element={<RequireAuth><PPCDataDemand /></RequireAuth>} />
         <Route path="/ppc-data/mps" element={<RequireAuth><PPCDataMPS /></RequireAuth>} />
         <Route path="/ppc-data/r3ss" element={<RequireAuth><PPCDataR3SS /></RequireAuth>} />
+        <Route path="/ppc-data/rm-sourcing" element={<RequireAuth><PPCRMSourcing /></RequireAuth>} />
         <Route path="/ppc-data/feasibility" element={<RequireAuth><PPCFeasibility /></RequireAuth>} />
         <Route path="/ppc-data/release/:id" element={<RequireAuth><PPCFeasibility /></RequireAuth>} />
         <Route path="/ppc-data/material" element={<RequireAuth><PPCMaterial /></RequireAuth>} />

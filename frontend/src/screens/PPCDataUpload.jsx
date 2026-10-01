@@ -38,6 +38,11 @@ const R3SS_SOURCE_TABLES = [
   { key: 'fg_dispatch',        ref: 'S3', file: 'FG Issue qty .xlsx',        label: 'FG Dispatch',           freq: 'Monthly', note: 'Disp (sales/dispatch qty)' },
   { key: 'mps_schedule_form',  ref: 'S4', file: 'MpsSS.xlsm',               label: 'MPS Schedule Form',     freq: 'Monthly', note: 'W1-W5 weeks, Additional Demand' },
   { key: 'demand_freeze',      ref: 'S5', file: 'August forecast 2026.xlsx', label: 'Demand Freeze',         freq: 'Monthly', note: 'Initial Demand (also via Demand Freeze page)' },
+  { key: 'monitoring',         ref: 'S6', file: 'Monitoring.xlsx',           label: 'Monitoring',            freq: 'Monthly', note: 'Green Level, EBQ, ASP' },
+  { key: 'dispatch_trends',    ref: 'S7', file: 'Dispatch Trends.xlsx',      label: 'Dispatch Trends',       freq: 'Monthly', note: 'Green Level (Average) per ERP' },
+  { key: 'bhr_fleetguard',     ref: 'S8', file: 'BHR Fleetguard.xlsx',       label: 'BHR Fleetguard',        freq: 'Monthly', note: 'Green Level for Fleet Guard parts' },
+  { key: 'sales_register',     ref: 'M1', file: 'Sales Register (current)',  label: 'Sales Register (Current) → SR 26-27', freq: 'Monthly', note: 'MTO/MTS engine' },
+  { key: 'sales_register_fy',  ref: 'M2', file: 'Sales Register FY 25-26',   label: 'Sales Register (FY 25-26)', freq: 'Yearly', note: 'MTO/MTS engine — pick this for the FY file' },
 ]
 
 /**
@@ -191,8 +196,8 @@ export default function PPCDataUpload() {
                 style={{ width: '100%', padding: 8, marginTop: 4, border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff' }}
               >
                 <option value="">Auto-detect from filename</option>
-                {[...MASTER_TABLES.map(t => t.key), ...R3SS_SOURCE_TABLES.map(t => t.key), ...ERP_TABLES.map(t => t.key)].map((k) => (
-                  <option key={k} value={k}>{k}</option>
+                {R3SS_SOURCE_TABLES.map((t) => (
+                  <option key={t.key} value={t.key}>{t.label} — {t.file}</option>
                 ))}
               </select>
             </div>

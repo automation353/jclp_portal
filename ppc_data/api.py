@@ -40,7 +40,12 @@ R3SS_ALLOWED_KEYS = frozenset({
     "fg_stock_statement",   # FG.xlsx (Stock Statement) → Opening Balance, FG
     "dpr_production",       # DPR all Plant.xlsx → Pack (production qty)
     "fg_dispatch",          # FG Issue qty .xlsx → Disp (dispatch qty)
-    "monitoring",           # Monitoring.xlsx → Green Level (per ERP) + EBQ (per family)
+    "monitoring",           # Monitoring.xlsx → EBQ (per family) + ASP (per group)
+    "dispatch_trends",      # Dispatch Trends.xlsx → Green Level (Average) per ERP
+    "bhr_fleetguard",       # BHR Fleetguard.xlsx → Green Level for Fleet Guard parts
+    "sales_register",       # Sales Register (current) → SR 26-27 tab (MTO/MTS)
+    "sales_register_fy",    # Sales Register FY 25-26 → MTO/MTS
+    "bom",                  # RM Sourcing (RMCP) — BOM dump from TCS iON (P1)
     "batch_ebq",            # EBQ Qualification.xlsx → EBQ rounding
     # Master tables (uploaded once, rarely changes)
     "item_master",
@@ -94,6 +99,19 @@ def _detect_table_key(filename, sheet_names=None):
     # Monitoring.xlsx → Green Level (per ERP) + EBQ (per family), raw passthrough
     if "monitoring" in fn:
         return "monitoring"
+    # Dispatch Trends.xlsx → Green Level (Average) per ERP
+    if "dispatch" in fn and "trend" in fn:
+        return "dispatch_trends"
+    # BHR Fleetguard.xlsx → Green Level for Fleet Guard parts (by Cust Part No)
+    if "fleetguard" in fn or ("bhr" in fn and "fleet" in fn) or "fleet guard" in fn:
+        return "bhr_fleetguard"
+    # Sales Register (both current + FY share the same filename pattern, so we
+    # default to the current register; upload the FY file with an explicit
+    # ?table_key=sales_register_fy).
+    if "sales" in fn and ("invoice" in fn or "register" in fn):
+        if "25-26" in fn or "25_26" in fn or "fy" in fn:
+            return "sales_register_fy"
+        return "sales_register"
     # W1.4 — Process File.xlsx → route_master
     if "process" in fn and "file" in fn:
         return "route_master"
@@ -253,6 +271,47 @@ def upload(request):
         "" if request.data.get("notes") is None
         else str(request.data["notes"])
     )[:500]
+
+    # ── RM Sourcing (RMCP): BOM dump → trimmed → RMCP sheet via the RMCP
+    # webhook. Fully isolated from the R3SS/MTO-MTS pipeline. ──
+    if table_key == "bom":
+        from .rm_sourcing import ingest_bom
+
+        try:
+            bom_result = ingest_bom(stored_path, original_name, uploader=str(request.user))
+            log.info("RMCP BOM ingest: %s", bom_result)
+        except Exception as exc:
+            log.exception("RMCP BOM ingest failed")
+            bom_result = {"ok": False, "error": str(exc)}
+        return Response({
+            "table_key": table_key,
+            "original_filename": original_name,
+            "row_count": bom_result.get("total_rows", 0),
+            "bom": bom_result,
+        }, status=status.HTTP_201_CREATED)
+
+    # ── Sales Registers: aggregate in Django (do NOT push ~40k raw rows to the
+    # sheet — that chunked write was truncating the FY tab). The MTO/MTS engine
+    # reads this cached aggregate on Recompute. ──
+    if table_key in ("sales_register", "sales_register_fy"):
+        from .mto_mts_compute import ingest_register
+
+        kind = "fy" if table_key == "sales_register_fy" else "current"
+        try:
+            ingest_result = ingest_register(
+                stored_path, kind, original_name, uploader=str(request.user),
+            )
+            log.info("MTO/MTS register ingest (%s): %s", kind, ingest_result)
+        except Exception as exc:
+            log.exception("Register ingest failed for %s", table_key)
+            ingest_result = {"ok": False, "error": str(exc)}
+
+        return Response({
+            "table_key": table_key,
+            "original_filename": original_name,
+            "row_count": ingest_result.get("line_count", 0),
+            "mto_mts_ingest": ingest_result,
+        }, status=status.HTTP_201_CREATED)
 
     # ── R3SS source files: raw passthrough to n8n (no Django storage) ──
     from .sheet_sync import _RAW_SHEET_CONFIG

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import api, api_dashboard, api_demand, api_feasibility, api_material, api_mps, api_production, api_r3ss, api_wave1_test
+from . import api, api_dashboard, api_demand, api_feasibility, api_material, api_mps, api_production, api_r3ss, api_rm_sourcing, api_wave1_test
 
 urlpatterns = [
     # L0 — Master upload screen
@@ -8,6 +8,12 @@ urlpatterns = [
     path("uploads/", api.list_uploads, name="ppc_data_list_uploads"),
     # Table data retrieval (all levels)
     path("table/<slug:table_key>/", api.table_data, name="ppc_data_table"),
+    # RM Sourcing (RMCP)
+    path("rm-sourcing/recompute/", api_rm_sourcing.rm_recompute, name="ppc_data_rm_recompute"),
+    path("rm-sourcing/rm-quantity/", api_rm_sourcing.rm_quantity, name="ppc_data_rm_quantity"),
+    path("rm-sourcing/rm-usage/", api_rm_sourcing.rm_usage, name="ppc_data_rm_usage"),
+    path("rm-sourcing/rm-by-bom/", api_rm_sourcing.rm_by_bom, name="ppc_data_rm_by_bom"),
+    path("rm-sourcing/cp-req/", api_rm_sourcing.cp_req, name="ppc_data_cp_req"),
     # L1 — ERP landing (n8n → Django)
     path("erp-landing/", api.erp_landing, name="ppc_data_erp_landing"),
     # Feed status (admin monitoring)

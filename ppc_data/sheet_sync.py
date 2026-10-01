@@ -760,6 +760,21 @@ def sync_upload_to_sheet(batch):
 # For R3SS source files, read raw sheets and POST directly to n8n.
 # n8n handles routing; Apps Script writes to the Google Sheet.
 
+# Columns kept from the 233-column Sales Register (the rest — addresses, GST,
+# tax breakups, transporter, charges, service lines — are irrelevant to the
+# MTO/MTS movement logic). Mirrors what the file's "Consolidated" tab uses.
+_SALES_REGISTER_COLUMNS = [
+    "Site", "Invoice No", "Invoice Date", "Invoice Type", "Invoice Status",
+    "Goods Receipt Number", "Goods Received Date",
+    "Customer Code", "Customer Name",
+    "Party Category Description", "Party A/C Description",
+    "Item Group", "Item Group Description", "Item Code", "Item Name",
+    "Item A/C Description", "Item Category Description",
+    "Item Sales Qty", "Item Sales UOM", "Item Base Qty", "Item Base UOM",
+    "Item Rate", "Item Amount", "Item Net Amount", "Invoice Amount",
+    "Invoice Category",
+]
+
 _RAW_SHEET_CONFIG = {
     "demand_freeze": {
         "sheets": ["Initial Demand", "Additional W1", "Additional W2",
@@ -795,17 +810,50 @@ _RAW_SHEET_CONFIG = {
         "sheets": ["Raw Data", "Family Group"],
         "tab_name": "Monitoring",
     },
+    "dispatch_trends": {
+        # Special-cased: "Data" sheet, ERP Code -> Green Level (col AA).
+        "sheets": ["Data"],
+        "tab_name": "Dispatch Trends",
+    },
+    "bhr_fleetguard": {
+        # Special-cased: "Stock" sheet, Part No -> Green Level (col D).
+        "sheets": ["Stock"],
+        "tab_name": "BHR Fleetguard",
+    },
+    # ── MTO/MTS v3: two Sales Registers (233 cols, ~16k rows each). Trimmed to
+    # the columns the Consolidated + MTO/MTS logic needs, chunked to the sheet.
+    "sales_register": {
+        "sheets": ["Sales Invoice Register Report"],
+        "tab_name": "SR 26-27",
+        "read_only": False,
+        "chunk": 2000,
+        "keep_columns": _SALES_REGISTER_COLUMNS,
+    },
+    "sales_register_fy": {
+        "sheets": ["Sales Invoice Register Report"],
+        "tab_name": "Sales Register FY 25-26",
+        "read_only": False,
+        "chunk": 2000,
+        "keep_columns": _SALES_REGISTER_COLUMNS,
+    },
 }
 
 
-def _read_raw_sheets(file_path, sheet_names=None, read_only=True):
+def _read_raw_sheets(file_path, sheet_names=None, read_only=True, keep_columns=None):
     """Read raw cell values from an Excel file.
 
     Returns list of dicts: [{sheet, headers, rows}].
     Each row is a dict keyed by header name.
     Use read_only=False for pivot tables.
+    keep_columns: optional list of header names to keep (others dropped) — used
+    to trim very wide sheets (e.g. the 233-column Sales Register) down to the
+    columns the downstream logic needs.
     """
     from openpyxl import load_workbook
+
+    keep_set = None
+    if keep_columns:
+        keep_set = {str(c).strip().lower() for c in keep_columns}
 
     wb = load_workbook(file_path, data_only=True, read_only=read_only)
     results = []
@@ -842,14 +890,19 @@ def _read_raw_sheets(file_path, sheet_names=None, read_only=True):
             s = str(h).strip() if h is not None else ""
             headers.append(s)
 
+        # Which column indexes to keep (all, or only keep_columns)
+        keep_idx = [
+            j for j, hdr in enumerate(headers)
+            if hdr and (keep_set is None or hdr.strip().lower() in keep_set)
+        ]
+
         rows = []
         for i in range(header_idx + 1, len(all_rows)):
             vals = all_rows[i]
             has_data = False
             row = {}
-            for j, hdr in enumerate(headers):
-                if not hdr:
-                    continue
+            for j in keep_idx:
+                hdr = headers[j]
                 v = vals[j] if j < len(vals) else None
                 if v is not None and str(v).strip():
                     has_data = True
@@ -861,7 +914,7 @@ def _read_raw_sheets(file_path, sheet_names=None, read_only=True):
 
         results.append({
             "sheet": matched,
-            "headers": [h for h in headers if h],
+            "headers": [headers[j] for j in keep_idx],
             "rows": rows,
         })
 
@@ -915,10 +968,12 @@ def _build_demand_rows(file_path):
 
 
 def _build_monitoring_rows(file_path):
-    """Build one clean Monitoring row per ERP code: item_code, green_level, ebq.
+    """Build one clean Monitoring row per ERP code: item_code, green_level, ebq, asp.
 
     Green Level is per ERP code (Monitoring "Raw Data" sheet). EBQ is per family
-    (Monitoring "Family Group" sheet); each item inherits its family's EBQ.
+    (Monitoring "Family Group" sheet). ASP is per Product Group (Monitoring
+    "Batch Qty" sheet), matching the reference R3SS VLOOKUP. Each item inherits
+    its family's EBQ and its product group's ASP.
     """
     from openpyxl import load_workbook
 
@@ -929,6 +984,25 @@ def _build_monitoring_rows(file_path):
             return float(v)
         except (TypeError, ValueError):
             return 0.0
+
+    # ── Product Group -> ASP from "Batch Qty" ──
+    pg_asp = {}
+    if "Batch Qty" in wb.sheetnames:
+        rows = list(wb["Batch Qty"].iter_rows(values_only=True))
+        hi = 0
+        for i, r in enumerate(rows[:8]):
+            cells = [str(c).strip().lower() if c is not None else "" for c in r]
+            if "product group" in cells and "asp" in cells:
+                hi = i
+                break
+        hdr = [str(c).strip() if c is not None else "" for c in rows[hi]]
+        pg_i = next((j for j, h in enumerate(hdr) if h.lower() == "product group"), None)
+        asp_i = next((j for j, h in enumerate(hdr) if h.lower() == "asp"), None)
+        if pg_i is not None and asp_i is not None:
+            for r in rows[hi + 1:]:
+                pg = str(r[pg_i]).strip().upper() if pg_i < len(r) and r[pg_i] is not None else ""
+                if pg and pg not in pg_asp:
+                    pg_asp[pg] = _num(r[asp_i]) if asp_i < len(r) else 0.0
 
     # ── Family -> EBQ from "Family Group" ──
     fam_ebq = {}
@@ -965,6 +1039,7 @@ def _build_monitoring_rows(file_path):
         erp_i = col("ERP Code")
         gl_i = col("Green Level")
         fam_i = col("Family")
+        pg_i = col("Product Group")
         if erp_i is not None:
             for r in rows[hi + 1:]:
                 ic = str(r[erp_i]).strip().upper() if erp_i < len(r) and r[erp_i] is not None else ""
@@ -972,12 +1047,85 @@ def _build_monitoring_rows(file_path):
                     continue
                 gl = _num(r[gl_i]) if gl_i is not None and gl_i < len(r) else 0.0
                 fam = str(r[fam_i]).strip().upper() if fam_i is not None and fam_i < len(r) and r[fam_i] is not None else ""
+                pg = str(r[pg_i]).strip().upper() if pg_i is not None and pg_i < len(r) and r[pg_i] is not None else ""
                 out[ic] = {
                     "item_code": ic,
                     "green_level": round(gl, 2),
                     "ebq": round(fam_ebq.get(fam, 0.0), 2),
+                    "asp": round(pg_asp.get(pg, 0.0), 3),
                 }
     wb.close()
+    return [out[k] for k in sorted(out)]
+
+
+def _find_header_row(rows, must_have):
+    """Return index of the first row (within first 8) containing all `must_have`
+    header labels (case-insensitive)."""
+    want = [m.lower() for m in must_have]
+    for i, r in enumerate(rows[:8]):
+        cells = [str(c).strip().lower() if c is not None else "" for c in r]
+        if all(any(w == c for c in cells) for w in want):
+            return i
+    return 0
+
+
+def _build_dispatch_trends_rows(file_path):
+    """Dispatch Trends "Data" sheet -> item_code (ERP Code) + green_level (Green Level).
+
+    This is the reference's Green Level source (the "Average" column).
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(file_path, data_only=True, read_only=True)
+    ws = wb["Data"] if "Data" in wb.sheetnames else wb[wb.sheetnames[0]]
+    rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+    hi = _find_header_row(rows, ["erp code", "green level"])
+    hdr = [str(c).strip() if c is not None else "" for c in rows[hi]]
+    erp_i = next((j for j, h in enumerate(hdr) if h.lower() == "erp code"), None)
+    gl_i = next((j for j, h in enumerate(hdr) if h.lower() == "green level"), None)
+    out = {}
+    if erp_i is None:
+        return []
+    for r in rows[hi + 1:]:
+        ic = str(r[erp_i]).strip().upper() if erp_i < len(r) and r[erp_i] is not None else ""
+        if not ic or ic == "0" or ic in out:
+            continue
+        try:
+            gl = float(r[gl_i]) if gl_i is not None and gl_i < len(r) and r[gl_i] not in (None, "") else 0.0
+        except (TypeError, ValueError):
+            gl = 0.0
+        out[ic] = {"item_code": ic, "green_level": round(gl, 2)}
+    return [out[k] for k in sorted(out)]
+
+
+def _build_bhr_rows(file_path):
+    """BHR Fleetguard "Stock" sheet -> part_no (PART NO.) + green_level (Green Level).
+
+    Fleet Guard customers take their Green Level from here (by Cust Part No).
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(file_path, data_only=True, read_only=True)
+    ws = wb["Stock"] if "Stock" in wb.sheetnames else wb[wb.sheetnames[0]]
+    rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+    hi = _find_header_row(rows, ["part no.", "green level"])
+    hdr = [str(c).strip() if c is not None else "" for c in rows[hi]]
+    pn_i = next((j for j, h in enumerate(hdr) if h.lower() in ("part no.", "part no")), None)
+    gl_i = next((j for j, h in enumerate(hdr) if h.lower() == "green level"), None)
+    out = {}
+    if pn_i is None:
+        return []
+    for r in rows[hi + 1:]:
+        pn = str(r[pn_i]).strip().upper() if pn_i < len(r) and r[pn_i] is not None else ""
+        if not pn or pn == "0" or pn in out:
+            continue
+        try:
+            gl = float(r[gl_i]) if gl_i is not None and gl_i < len(r) and r[gl_i] not in (None, "") else 0.0
+        except (TypeError, ValueError):
+            gl = 0.0
+        out[pn] = {"part_no": pn, "green_level": round(gl, 2)}
     return [out[k] for k in sorted(out)]
 
 
@@ -1004,7 +1152,11 @@ def sync_raw_to_sheet(file_path, table_key, original_filename, uploader="system"
         "demand_freeze": (_build_demand_rows,
                           ["item_code", "initial", "additional", "reduced", "total"]),
         "monitoring": (_build_monitoring_rows,
-                       ["item_code", "green_level", "ebq"]),
+                       ["item_code", "green_level", "ebq", "asp"]),
+        "dispatch_trends": (_build_dispatch_trends_rows,
+                            ["item_code", "green_level"]),
+        "bhr_fleetguard": (_build_bhr_rows,
+                           ["part_no", "green_level"]),
     }
     if table_key in _NORMALISED:
         builder, headers = _NORMALISED[table_key]
@@ -1039,6 +1191,7 @@ def sync_raw_to_sheet(file_path, table_key, original_filename, uploader="system"
         sheet_data = _read_raw_sheets(
             file_path, config["sheets"],
             read_only=config.get("read_only", True),
+            keep_columns=config.get("keep_columns"),
         )
     except Exception as exc:
         log.exception("Raw sheet read failed for %s", file_path)
@@ -1064,20 +1217,39 @@ def sync_raw_to_sheet(file_path, table_key, original_filename, uploader="system"
             row["_source_sheet"] = sheet_name
             all_rows.append(row)
 
-    payload = {
-        "action": "write_tab",
-        "report_key": table_key,
-        "tab_name": config["tab_name"],
-        "headers": headers,
-        "rows": all_rows,
-        "row_count": len(all_rows),
-        "_meta": {
-            "source": "ppc_portal_raw",
-            "original_filename": original_filename,
-            "uploader": uploader,
-        },
+    meta = {
+        "source": "ppc_portal_raw",
+        "original_filename": original_filename,
+        "uploader": uploader,
     }
-    result = _post_to_webhook(url, payload, f"raw {config['tab_name']}")
+
+    # Large sheets (e.g. Sales Registers, ~16k rows) must be chunked so the n8n
+    # webhook body and Google Sheets write stay within limits.
+    CHUNK = int(config.get("chunk", 2000))
+    if len(all_rows) <= CHUNK:
+        payload = {
+            "action": "write_tab", "report_key": table_key,
+            "tab_name": config["tab_name"], "headers": headers,
+            "rows": all_rows, "row_count": len(all_rows), "_meta": meta,
+        }
+        result = _post_to_webhook(url, payload, f"raw {config['tab_name']}")
+    else:
+        total_chunks = (len(all_rows) + CHUNK - 1) // CHUNK
+        result = {}
+        for ci in range(total_chunks):
+            chunk = all_rows[ci * CHUNK:(ci + 1) * CHUNK]
+            payload = {
+                "action": "write_tab", "report_key": table_key,
+                "tab_name": config["tab_name"], "headers": headers,
+                "rows": chunk, "row_count": len(chunk),
+                "chunk_index": ci, "total_chunks": total_chunks,
+                "append": ci > 0, "_meta": meta,
+            }
+            result = _post_to_webhook(
+                url, payload,
+                f"raw {config['tab_name']} chunk {ci+1}/{total_chunks}")
+            if not result.get("ok"):
+                break
 
     return {
         "ok": result.get("ok", False),

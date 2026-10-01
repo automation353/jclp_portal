@@ -152,6 +152,12 @@ export const api = {
     if (tableKey) form.append('table_key', tableKey)
     return request('/ppc-data/upload/', { method: 'POST', formData: form })
   },
+  rmSourcingRecompute: () =>
+    request('/ppc-data/rm-sourcing/recompute/', { method: 'POST' }),
+  rmSourcingQuantity: () => request('/ppc-data/rm-sourcing/rm-quantity/'),
+  rmSourcingUsage: (rm) => request(`/ppc-data/rm-sourcing/rm-usage/?rm=${encodeURIComponent(rm)}`),
+  rmSourcingByBom: () => request('/ppc-data/rm-sourcing/rm-by-bom/'),
+  rmSourcingCpReq: () => request('/ppc-data/rm-sourcing/cp-req/'),
   ppcDataTable: (tableKey, limit = 200, search = '') =>
     request(`/ppc-data/table/${tableKey}/?limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}`),
   ppcDataFeedStatus: () => request('/ppc-data/feed-status/'),

@@ -9,3 +9,12 @@ frontend/dist/
 *.egg-info/
 logs/
 uploads/
+
+# RM Sourcing / MTO-MTS runtime caches (regenerated on upload/recompute)
+ppc_data/mto_mts_state/
+ppc_data/rm_sourcing_state/
+
+# Large reference / input workbooks (not source)
+MTO_MTS Details V3 (Logic change).xlsx
+RM CP Packing Mtl Planning.xlsx
+JCPL-RMCP-Process-Steps.docx

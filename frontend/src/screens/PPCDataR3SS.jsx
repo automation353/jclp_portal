@@ -82,10 +82,8 @@ const COLS = [
   { key: 'family',         label: 'Family',          group: 'class' },
   { key: 'product_group',  label: 'Product Group',   group: 'class' },
   { key: 'section',        label: 'Section',         group: 'class' },
-  { key: 'plant',          label: 'Plant',           group: 'class' },
   { key: 'mto_mts',        label: 'MTO/MTS',         group: 'class' },
-  { key: 'category',       label: 'Customer',         group: 'class' },
-  { key: 'priority',       label: 'Priority',        group: 'class', last: true },
+  { key: 'category',       label: 'Customer',         group: 'class', last: true },
 
   // Engineering
   { key: 'teeth',          label: 'No of Teeth',     group: 'engg', num: true },
@@ -238,7 +236,6 @@ export default function PPCDataR3SS() {
       family:        uniq('family'),
       product_group: uniq('product_group'),
       mto_mts:       uniq('mto_mts'),
-      priority:      uniq('priority'),
     }
   }, [data])
 
@@ -365,20 +362,18 @@ export default function PPCDataR3SS() {
       )
     }
 
-    // Special: MTO/MTS pill
+    // Special: MTO/MTS pill — computed recent status from the MTO_MTS tab
+    // (MTS/MTO), or NA when the item has no recent sales to classify.
     if (col.key === 'mto_mts') {
+      const status = val || 'NA'
+      const cls = status === 'MTS'
+        ? 'r3ss-mts'
+        : status === 'MTO' ? 'r3ss-mto' : 'r3ss-na'
       return (
         <td key={col.key} className={sepCls}>
-          {val
-            ? <span className={val === 'MTO' ? 'r3ss-mto' : 'r3ss-mts'}>{val}</span>
-            : '—'}
+          <span className={cls}>{status}</span>
         </td>
       )
-    }
-
-    // Special: priority
-    if (col.key === 'priority') {
-      return <td key={col.key} className={`${priClass(val)}${sepCls}`}>{val || '—'}</td>
     }
 
     // Numeric
@@ -583,7 +578,6 @@ export default function PPCDataR3SS() {
               { key: 'family',        label: 'Family' },
               { key: 'product_group', label: 'Group' },
               { key: 'mto_mts',       label: 'MTO/MTS' },
-              { key: 'priority',      label: 'Priority' },
             ].map(f => (
               <div key={f.key} className="r3ss-filter">
                 <label>{f.label}</label>
