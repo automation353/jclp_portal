@@ -397,6 +397,9 @@ th.num{text-align:right}
 .mto-table thead th{position:sticky;top:0;background:var(--steel);color:#fff;z-index:2;font-weight:600;
   font-size:11.5px;letter-spacing:.02em;text-transform:uppercase}
 .mto-table td.muted{color:var(--muted)}
+/* Long descriptions wrap onto multiple lines instead of stretching the column */
+.mto-table td.desc-wrap{white-space:normal;overflow-wrap:anywhere;word-break:break-word;
+  max-width:340px;min-width:200px;vertical-align:top;line-height:1.35}
 .mto-table td.cell-mts{background:#e8f5e9;color:#1b5e20;font-weight:600;text-align:center}
 .mto-table td.cell-mto{background:#fff3e0;color:#e65100;font-weight:600;text-align:center}
 .mto-table .month-col{min-width:78px;text-align:center}

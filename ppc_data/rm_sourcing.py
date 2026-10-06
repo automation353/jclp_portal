@@ -37,13 +37,28 @@ RM_QUANTITY_TAB = RM_QTY_TAB          # back-compat alias for read_rm_quantity
 # Plan tab = the R3SS dashboard columns (per the process doc), in this order.
 PLAN_HEADERS = ["Sr No.", "Family", "Customer", "Cust Part No", "JollySize",
                 "ERP Code", "BOM Code", "Quantity"]
-CP_REQ_HEADERS = ["BOM Code", "Item Code", "BOM Qty (per 1000)",
-                  "Planned Qty", "Requirement", "UOM", "Part Description"]
-RM_REQ_HEADERS = ["RM Code", "Description", "Requirement", "UOM"]
-# RM QTY = the pivot handed to purchase (reference RM QTY columns).
-RM_QTY_HEADERS = ["RM Code", "Description", "Demand", "Green Level",
-                  "EBQ", "Demand +10%", "UOM"]
-QTY_SHEET_HEADERS = ["Item Code", "Description", "UOM", "Requirement"]
+# CP Req columns match the reference exactly: A=BOM Code, B=Item Code,
+# C=BOM Qty (per 1000), D=Qty in Nos (planned qty, VLOOKUP from Plan),
+# E=Qty (Base UOM) = D×C/1000 (the requirement), F=UOM, G=Part Description.
+CP_REQ_HEADERS = ["BOM Code", "Item Code", "BOM Qty", "Qty in Nos",
+                  "Qty (Base UOM)", "UOM", "Part Description"]
+# RM Req = line-level RM explosion, same columns as the reference RM Req /
+# CP Req: one row per FG → RM with the planned qty and the RM requirement.
+RM_REQ_HEADERS = ["BOM Code", "Item Code", "BOM Qty", "Qty in Nos",
+                  "Qty (Base UOM)", "UOM", "Part Description"]
+# RM QTY = the pivot handed to Purchase, matching the reference columns B–F.
+# Qty = computed (BOM × plan); Reqd Qty = the PPC head's manual final quantity
+# (preserved across recomputes, never overwritten by the automation); Qty +10%
+# = Qty × 1.1 helper. No green level here — the reference carries green only in
+# the "Against Demand" tabs, where Purchase nets it.
+RM_QTY_HEADERS = ["Item Code", "Description", "Qty", "Reqd Qty (in kgs)", "Qty +10%"]
+# Quantity Sheet = CP + packing, full reference columns. Qty (Base UOM) = our
+# computed requirement (SUMIF). qty per kg comes from the CP team's external
+# conversion sheet (not loaded yet) → blank; the two "Qty in nos" columns depend
+# on it, so they stay blank until that feed exists. Reqd Qty = manual (preserved).
+QTY_SHEET_HEADERS = ["Item Code", "Description", "UOM", "Qty (Base UOM)",
+                     "qty per kg", "Qty in nos (ERP)", "Reqd Qty",
+                     "Qty in nos (Correction)"]
 AD_RM_TAB = "Against Demand RM"
 AD_RM_HEADERS = ["Item Code", "Description", "Demand", "To Plan", "Stock",
                  "Green Level", "Procurement"]
@@ -534,13 +549,36 @@ def compute_rm(qty_field="to_plan"):
         green_req = greenq * qty / 1000.0     # RM green = roll up FG green via BOM
         desc = line.get("Part Description", "")
         uom = line.get("UOM", "")
+        is_rm = _is_rm(child)
         if planq > 0:
             cp_rows.append({
                 "BOM Code": parent, "Item Code": child,
-                "BOM Qty (per 1000)": qty, "Planned Qty": round(planq),
-                "Requirement": round(req, 3), "UOM": uom, "Part Description": desc,
+                "BOM Qty": qty, "Qty in Nos": round(planq),
+                "Qty (Base UOM)": round(req, 3), "UOM": uom,
+                "Part Description": desc,
             })
-        if _is_rm(child):
+            # Product-centric: this FG (BOM Code) → EVERY component it consumes
+            # (RM + CP + packing), so the By Product view shows the whole BOM.
+            bb = by_bom.get(pkey)
+            if bb is None:
+                pr = plan_by_code.get(pkey, {})
+                bb = {"bom_code": parent, "family": pr.get("Family", ""),
+                      "customer": pr.get("Customer", ""),
+                      "erp_code": pr.get("ERP Code", ""),
+                      "planned": round(planq),
+                      "rm_demand": 0.0, "cp_demand": 0.0,
+                      "rm_count": 0, "cp_count": 0, "parts": []}
+                by_bom[pkey] = bb
+            if req > 0:
+                bb["parts"].append({"code": child, "desc": desc, "uom": uom,
+                                    "req": round(req, 2), "rm": is_rm})
+                if is_rm:
+                    bb["rm_demand"] += req
+                    bb["rm_count"] += 1
+                else:
+                    bb["cp_demand"] += req
+                    bb["cp_count"] += 1
+        if is_rm:
             a = rm_agg.get(child)
             if a is None:
                 a = {"desc": desc, "uom": uom, "req": 0.0, "demand": 0.0, "green": 0.0}
@@ -548,19 +586,6 @@ def compute_rm(qty_field="to_plan"):
             a["req"] += req
             a["demand"] += dem
             a["green"] += green_req
-            # Product-centric: this FG (BOM Code) → the RM it consumes.
-            bb = by_bom.get(pkey)
-            if bb is None:
-                pr = plan_by_code.get(pkey, {})
-                bb = {"bom_code": parent, "family": pr.get("Family", ""),
-                      "customer": pr.get("Customer", ""),
-                      "erp_code": pr.get("ERP Code", ""),
-                      "planned": round(planq), "rm_demand": 0.0, "rms": []}
-                by_bom[pkey] = bb
-            bb["rm_demand"] += req
-            if req > 0:
-                bb["rms"].append({"code": child, "desc": desc,
-                                  "uom": uom, "req": round(req, 2)})
         else:
             a = cp_agg.get(child)
             if a is None:
@@ -568,16 +593,51 @@ def compute_rm(qty_field="to_plan"):
                 cp_agg[child] = a
             a["req"] += req
 
-    rm_req_rows = [{"RM Code": c, "Description": a["desc"],
-                    "Requirement": round(a["req"], 2), "UOM": a["uom"]}
+    # RM Req = the line-level RM explosion (one row per FG → RM), with the same
+    # columns as the reference RM Req / CP Req. The aggregated RM total per code
+    # lives in RM QTY (reference does the same: RM Req is detail, RM QTY is the
+    # SUMIF pivot). Our dump is single-level, so BOM Code is the FG parent.
+    rm_req_rows = [r for r in cp_rows if _is_rm(r["Item Code"])]
+    # Preserve the PPC head's manual "Reqd Qty" (reference column E) across
+    # recomputes: the automation fills only the computed Qty and the +10% helper,
+    # and must never overwrite the manual final quantity (Step 10 of the process).
+    prev_reqd = {}
+    for row in read_rm_quantity():
+        code = (row.get("Item Code") or row.get("RM Code") or "").strip()
+        val = (row.get("Reqd Qty (in kgs)") or row.get("Reqd Qty") or "").strip()
+        if code and val:
+            prev_reqd[code] = val
+    rm_qty_rows = [{"Item Code": c, "Description": a["desc"],
+                    "Qty": round(a["req"], 2),
+                    "Reqd Qty (in kgs)": prev_reqd.get(c, ""),
+                    "Qty +10%": round(a["req"] * 1.1, 2)}
                    for c, a in sorted(rm_agg.items())]
-    rm_qty_rows = [{"RM Code": c, "Description": a["desc"],
-                    "Demand": round(a["req"], 2),
-                    "Green Level": round(a["green"], 2), "EBQ": "",
-                    "Demand +10%": round(a["req"] * 1.1, 2), "UOM": a["uom"]}
-                   for c, a in sorted(rm_agg.items())]
+    # Preserve the two manual inputs on the Quantity Sheet across recomputes:
+    #   qty per kg = pieces-per-kg conversion from the CP team (external),
+    #   Reqd Qty   = PPC head's manual final.
+    prev_qs_reqd, prev_qpk = {}, {}
+    for row in read_quantity_sheet():
+        code = (row.get("Item Code") or "").strip()
+        if not code:
+            continue
+        if (row.get("Reqd Qty") or "").strip():
+            prev_qs_reqd[code] = row["Reqd Qty"].strip()
+        if (row.get("qty per kg") or "").strip():
+            prev_qpk[code] = row["qty per kg"].strip()
+    # Quantity Sheet is a HYBRID pivot: the Apps Script owns the live formulas for
+    # Description, UOM, Qty (Base UOM) and the two "Qty in nos" columns (they
+    # recalc in-sheet). Django sends only the keys and the two manual inputs
+    # (qty per kg, Reqd Qty); the Django values below are a fallback the Apps
+    # Script overrides with formulas. Logic (in the Apps Script):
+    #   Qty (Base UOM)          = SUMIF(CP Req Item Code, CP Req Qty (Base UOM))
+    #   Qty in nos (ERP)        = Qty (Base UOM) × qty per kg
+    #   Qty in nos (Correction) = Reqd Qty       × qty per kg
     qty_sheet_rows = [{"Item Code": c, "Description": a["desc"], "UOM": a["uom"],
-                       "Requirement": round(a["req"], 2)}
+                       "Qty (Base UOM)": round(a["req"], 2),
+                       "qty per kg": prev_qpk.get(c, ""),
+                       "Qty in nos (ERP)": "",
+                       "Reqd Qty": prev_qs_reqd.get(c, ""),
+                       "Qty in nos (Correction)": ""}
                       for c, a in sorted(cp_agg.items())]
     # Against Demand RM (reference): Demand = total-demand explosion, To Plan =
     # to_plan explosion (= RM QTY Demand), Procurement = To Plan − Stock + Green×0.6.
@@ -602,19 +662,21 @@ def compute_rm(qty_field="to_plan"):
     by_bom_list = sorted(by_bom.values(), key=lambda b: -b["rm_demand"])
     for b in by_bom_list:
         b["rm_demand"] = round(b["rm_demand"], 2)
-        b["rm_count"] = len(b["rms"])
-        b["rms"].sort(key=lambda x: -x["req"])
+        b["cp_demand"] = round(b["cp_demand"], 2)
+        # RM parts first, then the rest, each by descending requirement.
+        b["parts"].sort(key=lambda x: (0 if x["rm"] else 1, -x["req"]))
     try:
         with open(os.path.join(STATE_DIR, "rm_by_bom.json"), "w") as fh:
             json.dump(by_bom_list, fh)
     except Exception:
         log.exception("cache rm_by_bom failed")
 
-    log.info("RM compute: %d planned parents, %d CP lines, %d RM, %d CP/PKG | qty=%s",
+    log.info("RM compute: %d planned parents, %d CP lines, %d RM lines, %d RM codes, %d CP/PKG | qty=%s",
              len(matched_parents), len(cp_rows), len(rm_req_rows),
-             len(qty_sheet_rows), qty_field)
+             len(rm_qty_rows), len(qty_sheet_rows), qty_field)
     return {"ok": all(w.get("ok") for w in writes.values()),
             "planned_parents": len(matched_parents),
-            "cp_required_rows": len(cp_rows), "rm_items": len(rm_req_rows),
+            "cp_required_rows": len(cp_rows), "rm_req_lines": len(rm_req_rows),
+            "rm_items": len(rm_qty_rows),
             "cp_pkg_items": len(qty_sheet_rows), "qty_field": qty_field,
             "writes": {k: (v.get("ok"), v.get("rows_written")) for k, v in writes.items()}}

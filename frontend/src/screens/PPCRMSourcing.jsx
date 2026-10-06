@@ -73,19 +73,31 @@ export default function PPCRMSourcing() {
   function toggle(c) { setOpen(p => { const n = new Set(p); n.has(c) ? n.delete(c) : n.add(c); return n }) }
 
   // ---- derived per view ----
+  // RM QTY matches the reference columns: Qty (computed), Reqd Qty (PPC head's
+  // manual final — preserved across recomputes), Qty +10% helper. No green here:
+  // the reference carries green only in the Against Demand tabs.
   const rmView = useMemo(() => rmq.map(r => ({
-    code: r['RM Code'], desc: r.Description, demand: N(r.Demand), green: N(r['Green Level']),
-    proc: N(r.Demand) + N(r['Green Level']) * 0.6, d10: N(r['Demand +10%']), uom: r.UOM, grade: grade(r.Description),
+    code: r['Item Code'] || r['RM Code'], desc: r.Description,
+    qty: N(r.Qty), reqd: (r['Reqd Qty (in kgs)'] || r['Reqd Qty'] || '').trim(), d10: N(r['Qty +10%']),
+    grade: grade(r.Description),
   })), [rmq])
+  // Full Quantity Sheet columns: Qty (Base UOM) computed; qty per kg + Reqd Qty
+  // manual; the two "Qty in nos" columns auto-calc once qty per kg is entered.
   const cpView = useMemo(() => cp.map(r => ({
-    code: r['Item Code'], desc: r.Description, uom: r.UOM, req: N(r.Requirement), type: cpType(r['Item Code']),
+    code: r['Item Code'], desc: r.Description, uom: r.UOM,
+    req: N(r['Qty (Base UOM)'] ?? r.Requirement),
+    qpk: (r['qty per kg'] || '').toString().trim(),
+    nosErp: (r['Qty in nos (ERP)'] || '').toString().trim(),
+    reqd: (r['Reqd Qty'] || '').toString().trim(),
+    nosCorr: (r['Qty in nos (Correction)'] || '').toString().trim(),
+    type: cpType(r['Item Code']),
   })), [cp])
 
   const s = search.toLowerCase()
   const fgF = fgs.filter(r => !s || [r.bom_code, r.family, r.customer, r.erp_code].some(x => (x || '').toLowerCase().includes(s)))
     .sort((a, b) => N(b.rm_demand) - N(a.rm_demand))
   const rmF = rmView.filter(r => !s || r.code.toLowerCase().includes(s) || (r.desc || '').toLowerCase().includes(s))
-    .sort((a, b) => b.demand - a.demand)
+    .sort((a, b) => b.qty - a.qty)
   const cpF = cpView.filter(r => !s || r.code.toLowerCase().includes(s) || (r.desc || '').toLowerCase().includes(s))
     .sort((a, b) => b.req - a.req)
 
@@ -128,17 +140,19 @@ export default function PPCRMSourcing() {
                 <Tile label="Total RM Demand" value={fmt(fgs.reduce((a, r) => a + N(r.rm_demand), 0))} unit="Kg" kind="info" />
                 <Tile label="Products (FGs)" value={fgs.length} kind="score" />
                 <Tile label="RM Items" value={rmq.length} kind="info" />
-                <Tile label="Green Level" value={fmt(rmView.reduce((a, r) => a + r.green, 0))} unit="Kg" kind="score" />
-                <Tile label="Suggested Procurement" value={fmt(rmView.reduce((a, r) => a + r.proc, 0))} unit="Kg" kind="warn" />
+                <Tile label="CP / Packing Items" value={cp.length} kind="score" />
               </div>
               <Filters s={search} set={setSearch} ph="Search BOM code / family / customer" note={`${fgF.length} products`} />
               <div style={{ overflowX: 'auto', marginTop: 10 }}>
                 <table className="mto-table" style={{ minWidth: 800 }}>
-                  <thead><tr><th></th><th>BOM Code</th><th>Family</th><th>Customer</th><th className="num">Planned</th><th className="num">RM Demand (Kg)</th><th className="num">RM Items</th></tr></thead>
+                  <thead><tr><th></th><th>BOM Code</th><th>Family</th><th>Customer</th><th className="num">Planned FG Qty</th><th className="num">RM Demand (Kg)</th><th className="num">BOM Parts</th></tr></thead>
                   <tbody>
                     {fgF.length === 0 ? <tr><td colSpan={7}>No data — upload the BOM, then Recompute.</td></tr> :
                       fgF.map(r => {
                         const o = open.has(r.bom_code)
+                        const parts = r.parts || r.rms || []
+                        const nRm = r.rm_count ?? parts.filter(p => p.rm).length
+                        const nCp = r.cp_count ?? parts.filter(p => !p.rm).length
                         return [
                           <tr key={r.bom_code} style={{ cursor: 'pointer' }} onClick={() => toggle(r.bom_code)}>
                             <td style={{ width: 24, textAlign: 'center', color: 'var(--muted)' }}>{o ? '▾' : '▸'}</td>
@@ -146,13 +160,20 @@ export default function PPCRMSourcing() {
                             <td>{r.family}</td><td>{r.customer}</td>
                             <td className="num">{fmt(r.planned)}</td>
                             <td className="num" style={{ fontWeight: 700 }}>{fmt(r.rm_demand)}</td>
-                            <td className="num">{r.rm_count}</td>
+                            <td className="num">{nRm + nCp} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({nRm} RM / {nCp} CP)</span></td>
                           </tr>,
                           o && <tr key={r.bom_code + '_x'}><td></td><td colSpan={6} style={{ background: '#f7fafc', padding: '6px 10px' }}>
                             <table style={{ width: '100%', fontSize: 13 }}><tbody>
-                              {r.rms.map((m, j) => <tr key={j}>
-                                <td style={{ fontFamily: 'monospace', fontSize: 12, padding: '2px 8px' }}>{m.code}</td>
-                                <td style={{ padding: '2px 8px' }}>{m.desc}</td>
+                              {parts.map((m, j) => <tr key={j}>
+                                <td style={{ fontFamily: 'monospace', fontSize: 12, padding: '2px 8px', whiteSpace: 'nowrap' }}>{m.code}</td>
+                                <td style={{ padding: '2px 8px', maxWidth: 340, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{(m.desc || '').replace(/ /g, ' ')}</td>
+                                <td style={{ padding: '2px 8px', whiteSpace: 'nowrap' }}>
+                                  <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
+                                    background: m.rm ? '#e3f2fd' : (cpType(m.code) === 'Packing' ? '#e8f5e9' : '#f3e5f5'),
+                                    color: m.rm ? '#1565c0' : (cpType(m.code) === 'Packing' ? '#2e7d32' : '#6a1b9a') }}>
+                                    {m.rm ? 'RM' : cpType(m.code)}
+                                  </span>
+                                </td>
                                 <td style={{ textAlign: 'right', padding: '2px 8px', whiteSpace: 'nowrap' }}>{dec(m.req)} {m.uom}</td>
                               </tr>)}
                             </tbody></table>
@@ -167,25 +188,21 @@ export default function PPCRMSourcing() {
             {/* ---------- RM REQ ---------- */}
             {view === 'rm' && (<>
               <div className="dash-tile-grid">
-                <Tile label="Total RM Demand" value={fmt(rmF.reduce((a, r) => a + r.demand, 0))} unit="Kg" kind="info" />
+                <Tile label="Total RM Qty (computed)" value={fmt(rmF.reduce((a, r) => a + r.qty, 0))} unit="Kg" kind="info" />
                 <Tile label="RM Items" value={rmF.length} kind="score" />
-                <Tile label="Green Level" value={fmt(rmF.reduce((a, r) => a + r.green, 0))} unit="Kg" kind="score" />
-                <Tile label="Suggested Procurement" value={fmt(rmF.reduce((a, r) => a + r.proc, 0))} unit="Kg" kind="warn" />
+                <Tile label="Reqd Qty set (PPC)" value={rmF.filter(r => r.reqd).length} sub="manual final entered" kind="warn" />
               </div>
               <Filters s={search} set={setSearch} ph="Search RM code / description" note={`${rmF.length} raw materials`} />
               <div style={{ overflowX: 'auto', marginTop: 10 }}>
-                <table className="mto-table" style={{ minWidth: 820 }}>
-                  <thead><tr><th>RM Code</th><th>Description</th><th className="num">Demand</th><th className="num">Green Level</th><th className="num">Procurement</th><th className="num">+10%</th><th>UOM</th><th></th></tr></thead>
+                <table className="mto-table" style={{ minWidth: 760 }}>
+                  <thead><tr><th>Item Code</th><th>Description</th><th className="num">Qty</th><th className="num">Reqd Qty</th><th></th></tr></thead>
                   <tbody>
-                    {rmF.length === 0 ? <tr><td colSpan={8}>No RM requirement yet.</td></tr> :
+                    {rmF.length === 0 ? <tr><td colSpan={5}>No RM requirement yet.</td></tr> :
                       rmF.map((r, i) => <tr key={i}>
                         <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.code}</td>
-                        <td>{r.desc}</td>
-                        <td className="num">{fmt(r.demand)}</td>
-                        <td className="num">{fmt(r.green)}</td>
-                        <td className="num" style={{ fontWeight: 700, color: '#ef6c00' }}>{fmt(r.proc)}</td>
-                        <td className="num">{fmt(r.d10)}</td>
-                        <td>{r.uom}</td>
+                        <td className="desc-wrap">{(r.desc || '').replace(/ /g, ' ')}</td>
+                        <td className="num">{fmt(r.qty)}</td>
+                        <td className="num" style={{ fontWeight: 700, color: r.reqd ? '#2e7d32' : '#9aa0a6' }}>{r.reqd ? fmt(N(r.reqd)) : '—'}</td>
                         <td><button className="backbtn" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => openDrill(r.code)}>Where used</button></td>
                       </tr>)}
                   </tbody>
@@ -209,7 +226,7 @@ export default function PPCRMSourcing() {
                     {cpF.length === 0 ? <tr><td colSpan={6}>No CP/packing requirement yet.</td></tr> :
                       cpF.map((r, i) => <tr key={i}>
                         <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.code}</td>
-                        <td>{r.desc}</td>
+                        <td className="desc-wrap">{(r.desc || '').replace(/ /g, ' ')}</td>
                         <td><span className={r.type === 'Packing' ? 'r3ss-mts' : 'r3ss-na'}>{r.type}</span></td>
                         <td className="num" style={{ fontWeight: 700 }}>{dec(r.req)}</td>
                         <td>{r.uom}</td>
@@ -233,7 +250,7 @@ export default function PPCRMSourcing() {
             <p className="sub" style={{ fontSize: 13 }}>Finished goods that consume this item.</p>
             {drill.loading ? <div>Loading…</div> : drill.rows.length === 0 ? <div>No usage found.</div> : (
               <table className="mto-table" style={{ width: '100%' }}>
-                <thead><tr><th>FG / BOM Code</th><th className="num">Planned</th><th className="num">Req</th></tr></thead>
+                <thead><tr><th>FG / BOM Code</th><th className="num">Planned FG Qty</th><th className="num">Req</th></tr></thead>
                 <tbody>{drill.rows.map((u, i) => <tr key={i}>
                   <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{u.bom_code}</td>
                   <td className="num">{fmt(u.planned_qty)}</td>
