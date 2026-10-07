@@ -509,14 +509,18 @@ def _read_plan(qty_field="to_plan"):
                               "cust_part_no": d.get("description", ""),
                               "jolly_size": d.get("jolly_size", ""),
                               "erp": d.get("item_code", ""),
-                              "qty": 0.0, "green": 0.0, "demand": 0.0})
+                              "qty": 0.0, "green": 0.0, "demand": 0.0,
+                              "opening": 0.0, "fg_stock": 0.0})
         e["qty"] += _num(d.get(qty_field))          # to_plan (net production plan)
         e["green"] += _num(d.get("green_level"))
         e["demand"] += _num(d.get("total_demand"))  # gross sales demand
+        e["opening"] += _num(d.get("opening_balance"))  # FG opening stock (R23)
+        e["fg_stock"] += _num(d.get("fg_stock"))        # FG stock on hand (R23)
 
     plan = {}           # BOM Code (FG) → to_plan  (drives CP Req / RM QTY)
     demand = {}         # BOM Code (FG) → total_demand (the Against-Demand "Demand")
     green = {}          # BOM Code (FG) → FG green level (rolled up to RM)
+    fg_info = {}        # BOM Code (FG) → FG-level netting fields (R23 view)
     plan_rows = []
     sr = 0
     for m in _read_master_schedule():
@@ -538,7 +542,13 @@ def _read_plan(qty_field="to_plan"):
         plan[key] = plan.get(key, 0.0) + q
         demand[key] = demand.get(key, 0.0) + _num(d.get("demand"))
         green[key] = green.get(key, 0.0) + _num(d.get("green"))
-    return plan, demand, green, plan_rows
+        fi = fg_info.setdefault(key, {"opening": 0.0, "green": 0.0, "fg_stock": 0.0, "demand": 0.0, "to_plan": 0.0})
+        fi["opening"] += _num(d.get("opening"))
+        fi["green"] += _num(d.get("green"))
+        fi["fg_stock"] += _num(d.get("fg_stock"))
+        fi["demand"] += _num(d.get("demand"))
+        fi["to_plan"] += q
+    return plan, demand, green, plan_rows, fg_info
 
 
 def compute_rm(qty_field="to_plan"):
@@ -553,7 +563,7 @@ def compute_rm(qty_field="to_plan"):
     if not cache:
         return {"ok": False, "error": "No BOM cached — upload the BOM first."}
     try:
-        plan, demand, green, plan_rows = _read_plan(qty_field)
+        plan, demand, green, plan_rows, fg_info = _read_plan(qty_field)
     except Exception as exc:
         log.exception("RM compute: could not read R3SS plan")
         return {"ok": False, "error": f"Could not read R3SS plan: {exc}"}
@@ -595,10 +605,16 @@ def compute_rm(qty_field="to_plan"):
             bb = by_bom.get(pkey)
             if bb is None:
                 pr = plan_by_code.get(pkey, {})
+                fi = fg_info.get(pkey, {})
                 bb = {"bom_code": parent, "family": pr.get("Family", ""),
                       "customer": pr.get("Customer", ""),
                       "erp_code": pr.get("ERP Code", ""),
                       "planned": round(planq),
+                      # R23 — FG-level netting (from R3SS): demand, stock, green.
+                      "fg_demand": round(fi.get("demand", 0.0)),
+                      "fg_opening": round(fi.get("opening", 0.0)),
+                      "fg_stock": round(fi.get("fg_stock", 0.0)),
+                      "fg_green": round(fi.get("green", 0.0)),
                       "rm_demand": 0.0, "cp_demand": 0.0,
                       "rm_count": 0, "cp_count": 0, "parts": []}
                 by_bom[pkey] = bb
