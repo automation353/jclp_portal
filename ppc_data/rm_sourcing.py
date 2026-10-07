@@ -683,9 +683,12 @@ def compute_rm(qty_field="to_plan"):
 
     # Keep chunks small (~2000 rows) so each POST payload stays well under the
     # Apps Script /exec limit — wider tabs (CP Req = 7 cols) 404 at 5000/chunk.
+    # CP Req uses a smaller chunk (1000): it is the largest tab and every append
+    # to it triggers the live pivot SUMIFs to recalc, so lighter POSTs keep each
+    # Apps Script call well under its timeout and avoid the non-JSON/504 retries.
     writes = {
         PLAN_TAB: _write_tab_resumable(PLAN_TAB, PLAN_HEADERS, plan_rows, chunk=2000),
-        CP_REQ_TAB: _write_tab_resumable(CP_REQ_TAB, CP_REQ_HEADERS, cp_rows, chunk=2000),
+        CP_REQ_TAB: _write_tab_resumable(CP_REQ_TAB, CP_REQ_HEADERS, cp_rows, chunk=1000),
         RM_REQ_TAB: _write_tab_resumable(RM_REQ_TAB, RM_REQ_HEADERS, rm_req_rows, chunk=2000),
         RM_QTY_TAB: _write_tab_resumable(RM_QTY_TAB, RM_QTY_HEADERS, rm_qty_rows, chunk=2000),
         QTY_SHEET_TAB: _write_tab_resumable(QTY_SHEET_TAB, QTY_SHEET_HEADERS, qty_sheet_rows, chunk=2000),
