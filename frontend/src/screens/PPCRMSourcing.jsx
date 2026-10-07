@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import TopBar from '../components/TopBar'
 import { api } from '../api'
+import { RULE_SPEC, PRINCIPLES } from './ruleSpec'
 
 const N = (v) => { const x = parseFloat(String(v).replace(/,/g, '')); return Number.isFinite(x) ? x : 0 }
 const fmt = (v) => N(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })
@@ -29,11 +30,13 @@ const TABS = [
 // ── Rules tracker (static) — the JCPL operating rules that govern RM Sourcing,
 // grouped by band in build order. Status reflects what the module does TODAY.
 // Pure presentation: no data fetch, no backend, read-only. ──────────────────
+// Reuse the dashboard tile colour language (dash-tile-score/warn/blocked/info).
 const STATUS = {
-  live: { label: 'Live', bg: '#e8f5e9', fg: '#1b5e20', dot: '#2e7d32' },
-  partial: { label: 'Partial', bg: '#fff8e1', fg: '#e65100', dot: '#ef6c00' },
-  pending: { label: 'Pending', bg: '#eceff1', fg: '#455a64', dot: '#90a4ae' },
-  input: { label: 'Input', bg: '#e3f2fd', fg: '#1565c0', dot: '#1976d2' },
+  live: { label: 'Live', bg: '#dcefdc', fg: '#1b5e20', dot: '#2e7d32', tint: '#eaf5ea' },
+  partial: { label: 'Partial', bg: '#ffecb3', fg: '#e65100', dot: '#f6a800', tint: '#fff8e1' },
+  pending: { label: 'Pending', bg: '#dfe4e8', fg: '#455a64', dot: '#607d8b', tint: '#eceff1' },
+  input: { label: 'Input', bg: '#d6e8fb', fg: '#1565c0', dot: '#42a5f5', tint: '#f5f9fd' },
+  out: { label: 'Other module', bg: '#e0e0e0', fg: '#546e7a', dot: '#b0bec5', tint: '#f6f7f8' },
 }
 const RULE_BANDS = [
   {
@@ -64,6 +67,7 @@ const RULE_BANDS = [
       { id: 'R1', title: 'Plan qty = demand − (opening + green)', short: 'Comes in as R3SS to_plan — column D of the RMCP sheet.', status: 'input', depends: 'R23 (green definition)', needs: 'Live upstream' },
       { id: 'R2', title: 'Plan on live orders, not 3-month averages', short: 'Demand policy set upstream; module uses to_plan as given.', status: 'input', depends: '—', needs: 'Green granularity + MTS/MTO tag (PPC)' },
       { id: 'R3', title: 'Plan one month further out', short: 'Horizon set upstream; dashboard can default to month + 2.', status: 'input', depends: '—', needs: 'Live upstream' },
+      { id: 'R4', title: 'Advance Nov–Dec & export visibility sheets', short: 'Purchase hand-off sheets; firm Nov released, Dec tentative.', status: 'out', depends: 'R5, R6', needs: 'Confirmed Nov–Dec + export orders (PPC/Sales)' },
     ],
   },
   {
@@ -77,6 +81,28 @@ const RULE_BANDS = [
     ],
   },
   {
+    band: 'Part B — Capacity & manpower  (other module · PPC)',
+    note: 'Production capacity rules — not RM Sourcing. Shown for the full spec.',
+    rules: [
+      { id: 'R8', title: 'Plan occupancy at 80%; above that, expand', short: 'Per-line ceiling; third shift is emergency only.', status: 'out', depends: 'R9', needs: 'Installed capacity per line (Production)' },
+      { id: 'R9', title: 'Map product → infra; book capacity shift-wise', short: 'Re-allocate when a home line is over-demand.', status: 'out', depends: '—', needs: 'Product-to-infra map + tools (Production/Eng)' },
+      { id: 'R10', title: 'Move manpower with load; cut-off below 15%', short: 'Consolidate residual load; auto cut-off + override.', status: 'out', depends: 'R9', needs: 'Utilisation + absenteeism (PPC/HR)' },
+    ],
+  },
+  {
+    band: 'Part C — Vendor management  (other module · Purchase)',
+    note: 'Procurement & vendor rules — not RM Sourcing. R12 feeds R5 & R24.',
+    rules: [
+      { id: 'R12', title: 'No order without a written committed lead time', short: 'Vendor lead time in writing + D-day sign-off.', status: 'out', depends: '—', needs: 'Written vendor commitments (Purchase)' },
+      { id: 'R13', title: 'Sanitise & document the vendor process chain', short: 'End-to-end chain + stress points before ordering.', status: 'out', depends: '—', needs: 'Vendor process maps (Purchase)' },
+      { id: 'R14', title: 'Three quotes, release to lowest landed cost', short: 'Formal quotes, audit trail, break monopolies.', status: 'out', depends: '—', needs: 'Quotations (Purchase)' },
+      { id: 'R15', title: 'Standardise the ~15-day procurement cycle', short: 'Fixed calendar, rate freeze, fixed lots.', status: 'out', depends: '—', needs: 'Cycle calendar (Purchase)' },
+      { id: 'R16', title: 'Vendor stock in ERP by condition; reconcile', short: 'Issued = returned + scrap equivalent.', status: 'out', depends: '—', needs: 'Vendor stock feed (Purchase/Stores)' },
+      { id: 'R17', title: 'Upgrade suppliers with inconsistent quality', short: 'Tighten checks + tool validation; replace if needed.', status: 'out', depends: '—', needs: 'Rejection history (QA/Purchase)' },
+      { id: 'R18', title: 'Dedicated vehicle + worker-level follow-up', short: 'Vendor-site stock visibility posted into ERP.', status: 'out', depends: '—', needs: 'Freight cost-benefit (Purchase)' },
+    ],
+  },
+  {
     band: 'Part F — Method & governance  (overlay)',
     note: 'Sit under every band; depend on nothing.',
     rules: [
@@ -86,6 +112,179 @@ const RULE_BANDS = [
   },
 ]
 const ruleCount = (s) => RULE_BANDS.reduce((a, b) => a + b.rules.filter(r => r.status === s).length, 0)
+
+// Per-rule dashboards — each reads its own Google Sheet tab (or the live BOM
+// check) and renders the real data behind that rule.
+const RULE_DASH = {
+  R1: { mode: 'r3ss', title: 'R1 — Plan qty = demand − (opening + green)',
+    desc: 'The upstream plan inputs per FG, pulled live from R3SS.',
+    kpi: rows => [
+      { label: 'FGs', value: fmt(rows.length), kind: 'info' },
+      { label: 'Total Demand', value: fmt(rows.reduce((a, r) => a + N(r['Total Demand']), 0)), kind: 'info' },
+      { label: 'Total To Plan', value: fmt(rows.reduce((a, r) => a + N(r['To Plan']), 0)), kind: 'score' },
+    ] },
+  R2: { mode: 'r3ss', title: 'R2 — Plan on live orders · MTS / MTO tag',
+    desc: 'Each part tagged MTS or MTO from the R3SS overlay — the classification R2 depends on.',
+    kpi: rows => [
+      { label: 'MTS', value: fmt(rows.filter(r => r['MTO/MTS'] === 'MTS').length), kind: 'score' },
+      { label: 'MTO', value: fmt(rows.filter(r => r['MTO/MTS'] === 'MTO').length), kind: 'warn' },
+      { label: 'NA / untagged', value: fmt(rows.filter(r => !r['MTO/MTS'] || r['MTO/MTS'] === 'NA').length), kind: 'info' },
+    ] },
+  R3: { mode: 'r3ss', title: 'R3 — Plan one month ahead',
+    desc: 'Planning horizon from R3SS: reference = this month, buffer = next, target = month + 2.',
+    kpi: (rows, meta) => [
+      { label: 'Plan month', value: (meta && meta.plan_month) || '—', kind: 'info' },
+      { label: 'FGs planned', value: fmt(rows.filter(r => N(r['To Plan']) > 0).length), kind: 'score' },
+      { label: 'Total To Plan', value: fmt(rows.reduce((a, r) => a + N(r['To Plan']), 0)), kind: 'info' },
+    ] },
+  R19: { mode: 'dq', title: 'R19 — One part number, one description',
+    desc: 'Live check over the uploaded BOM: every item code should map to exactly one description.' },
+  R20: { tab: 'CP Req', title: 'R20 — RMCP sheet (A–C downloaded, D–F calculated)',
+    desc: 'The explosion sheet: A/B/C from the BOM dump, D = plan-qty lookup, E = BOM qty × plan ÷ 1000, F = UOM.',
+    kpi: rows => [
+      { label: 'CP-Req lines', value: fmt(rows.length), kind: 'info' },
+      { label: 'FGs exploded', value: fmt(new Set(rows.map(r => r['BOM Code'])).size), kind: 'score' },
+      { label: 'RM lines', value: fmt(rows.filter(r => /^R(M|1)/i.test(r['Item Code'] || '')).length), kind: 'info' },
+    ] },
+  R21: { tab: 'RM QTY', title: 'R21 — Aggregate RM (SUMIF, no double counting)',
+    desc: 'Each RM code appears once; its Qty = SUMIF of the CP-Req requirement across every FG that uses it.',
+    kpi: rows => [
+      { label: 'RM codes', value: fmt(rows.length), kind: 'info' },
+      { label: 'Total RM Qty', value: fmt(rows.reduce((a, r) => a + N(r.Qty), 0)), unit: 'Kg', kind: 'score' },
+    ] },
+  R22: { tab: 'RM QTY', title: 'R22 — Manual add-ons (PPC vs Computed)',
+    desc: 'Reqd Qty is the PPC head’s manual final — preserved and never overwritten by the automation.',
+    kpi: rows => [
+      { label: 'RM codes', value: fmt(rows.length), kind: 'info' },
+      { label: 'Manual (PPC) overrides', value: fmt(rows.filter(r => (r['Reqd Qty (in kgs)'] || '').toString().trim()).length), kind: 'warn' },
+    ] },
+  R23: { tab: 'Against Demand RM', title: 'R23 — Net requirement after green (Against Demand RM)',
+    desc: 'RM netting: Procurement = To Plan − Stock + Green × 0.6. Stock pending the Stores feed.',
+    kpi: rows => [
+      { label: 'RM codes', value: fmt(rows.length), kind: 'info' },
+      { label: 'Total To Plan', value: fmt(rows.reduce((a, r) => a + N(r['To Plan']), 0)), unit: 'Kg', kind: 'score' },
+      { label: 'Net Procurement', value: fmt(rows.reduce((a, r) => a + N(r.Procurement), 0)), unit: 'Kg', kind: 'warn' },
+    ] },
+  R27: { tab: 'Quantity Sheet', filter: 'packing', title: 'R27 — Packaging (annual job)',
+    desc: 'Packaging items split out from components — plan these as a yearly print order.',
+    kpi: rows => [{ label: 'Packing items', value: fmt(rows.length), kind: 'score' }] },
+}
+const NUMCOL = /qty|requirement|demand|plan|procurement|green|stock|\+10|nos|per kg/i
+
+function DqView({ dq }) {
+  if (!dq || !dq.ok) return <div>No BOM uploaded yet.</div>
+  const clean = !dq.conflicting_desc_count && !dq.blank_desc_count
+  return (<>
+    <div className="dash-tile-grid">
+      <Tile label="Item codes" value={fmt(dq.total_items)} kind="info" />
+      <Tile label="Conflicting descriptions" value={dq.conflicting_desc_count} kind={dq.conflicting_desc_count ? 'critical' : 'score'} />
+      <Tile label="Blank descriptions" value={dq.blank_desc_count} kind={dq.blank_desc_count ? 'warn' : 'score'} />
+    </div>
+    {clean ? <p className="sub" style={{ marginTop: 14, fontSize: 13 }}>✓ Every item code maps to exactly one description — R19 is clean.</p> : (
+      <div style={{ overflowX: 'auto', marginTop: 12 }}>
+        <table className="mto-table" style={{ minWidth: 560 }}>
+          <thead><tr><th>Item Code</th><th>Issue</th><th>Descriptions</th></tr></thead>
+          <tbody>
+            {(dq.conflicting_desc || []).map((c, i) => <tr key={'c' + i}><td style={{ fontFamily: 'monospace', fontSize: 12 }}>{c.code}</td><td><span className="r3ss-na">conflict</span></td><td className="desc-wrap">{c.descriptions.join('  |  ')}</td></tr>)}
+            {(dq.blank_desc || []).map((c, i) => <tr key={'b' + i}><td style={{ fontFamily: 'monospace', fontSize: 12 }}>{c}</td><td><span className="r3ss-na">blank</span></td><td>—</td></tr>)}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </>)
+}
+
+function ExBox({ title, body }) {
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px', background: '#fff' }}>
+      <div style={{ fontWeight: 700, fontSize: 11, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.03em' }}>{title}</div>
+      <pre style={{ margin: 0, fontFamily: 'ui-monospace,monospace', fontSize: 11.5, whiteSpace: 'pre-wrap', lineHeight: 1.5, color: 'var(--steel)' }}>{body}</pre>
+    </div>
+  )
+}
+function SpecSection({ spec }) {
+  if (!spec) return null
+  return (
+    <div className="rule-band" style={{ marginTop: 18 }}>
+      <h3 className="rule-band-head">Spec &amp; test cases</h3>
+      <p className="rule-band-note">{spec.rule}</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0 0 14px 12px' }}>
+        {spec.principles.map(p => <span key={p} className="rule-badge" style={{ background: '#eef2f7', color: 'var(--steel)', textTransform: 'none', letterSpacing: 0 }}>P{p} · {PRINCIPLES[p]}</span>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 12 }}>
+        <ExBox title="Test case 1" body={spec.ex1} />
+        <ExBox title="Test case 2" body={spec.ex2} />
+      </div>
+      <div style={{ marginTop: 12, fontSize: 12.5, lineHeight: 1.45 }}><b>Validation:</b> {spec.validation}</div>
+      <div style={{ marginTop: 8, fontSize: 12.5, padding: '8px 10px', background: '#eef7ef', borderRadius: 6, borderLeft: '3px solid #2e7d32' }}><b>Monthly check:</b> {spec.check}</div>
+    </div>
+  )
+}
+
+function RuleDash({ ruleId, onBack }) {
+  const cfg = RULE_DASH[ruleId]
+  const spec = RULE_SPEC[ruleId]
+  const bandRule = RULE_BANDS.flatMap(b => b.rules).find(r => r.id === ruleId)
+  const title = cfg ? cfg.title : `${ruleId} — ${bandRule ? bandRule.title : ''}`
+  const [rows, setRows] = useState([])
+  const [dq, setDq] = useState(null)
+  const [sheetUrl, setSheetUrl] = useState('')
+  const [meta, setMeta] = useState({})
+  const [loading, setLoading] = useState(!!cfg)
+  const [q, setQ] = useState('')
+  useEffect(() => {
+    if (!cfg) { setLoading(false); return }
+    let alive = true; setLoading(true)
+    const run = cfg.mode === 'dq'
+      ? api.rmSourcingDataQuality().then(d => { if (alive) setDq(d) })
+      : cfg.mode === 'r3ss'
+        ? api.rmSourcingR3ss().then(d => { if (!alive) return; setRows(d.rows || []); setMeta({ plan_month: d.plan_month }) })
+        : api.rmSourcingTab(cfg.tab).then(d => {
+          if (!alive) return
+          let rs = d.rows || []
+          if (cfg.filter === 'packing') rs = rs.filter(r => cpType(r['Item Code']) === 'Packing')
+          setRows(rs); setSheetUrl(d.sheet_url || '')
+        })
+    run.catch(() => { }).finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [ruleId])
+
+  const cols = rows.length ? Object.keys(rows[0]).filter(k => k) : []
+  const s = q.toLowerCase()
+  const shown = rows.filter(r => !s || cols.some(c => (r[c] || '').toString().toLowerCase().includes(s)))
+  const kpis = cfg && cfg.kpi ? cfg.kpi(rows, meta) : [{ label: 'Rows', value: fmt(rows.length), kind: 'info' }]
+  const srcLabel = cfg && cfg.mode === 'r3ss' ? 'live from R3SS' : (cfg ? `live from “${cfg.tab}”` : '')
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      <button className="backbtn" onClick={onBack}>← Back to Rules</button>
+      <h3 style={{ margin: '12px 0 2px' }}>{title}</h3>
+      <p className="sub" style={{ fontSize: 13, margin: '0 0 12px' }}>
+        {cfg ? cfg.desc : (spec ? spec.rule : '')}
+        {cfg && !cfg.mode && <> · <span style={{ color: 'var(--muted)' }}>live from Google Sheet tab “{cfg.tab}”</span></>}
+        {cfg && cfg.mode === 'r3ss' && <> · <span style={{ color: 'var(--muted)' }}>live from R3SS</span></>}
+        {sheetUrl && <> · <a href={sheetUrl} target="_blank" rel="noopener noreferrer">open sheet</a></>}
+      </p>
+      {cfg && (loading ? <div>Loading…</div> : cfg.mode === 'dq' ? <DqView dq={dq} /> : (<>
+        <div className="dash-tile-grid">{kpis.map((t, i) => <Tile key={i} {...t} />)}</div>
+        <Filters s={q} set={setQ} ph="Search" note={`${shown.length} of ${rows.length} rows · ${srcLabel}`} />
+        <div style={{ overflowX: 'auto', marginTop: 10 }}>
+          <table className="mto-table" style={{ minWidth: 760 }}>
+            <thead><tr>{cols.map(c => <th key={c} className={NUMCOL.test(c) ? 'num' : undefined}>{c}</th>)}</tr></thead>
+            <tbody>
+              {shown.length === 0 ? <tr><td colSpan={cols.length || 1}>No rows in this sheet tab.</td></tr> :
+                shown.slice(0, 1000).map((r, i) => <tr key={i}>
+                  {cols.map(c => <td key={c} className={NUMCOL.test(c) ? 'num' : (/desc/i.test(c) ? 'desc-wrap' : undefined)} style={/code/i.test(c) ? { fontFamily: 'monospace', fontSize: 12 } : undefined}>{(r[c] || '').toString().replace(/ /g, ' ')}</td>)}
+                </tr>)}
+            </tbody>
+          </table>
+        </div>
+        {shown.length > 1000 && <p className="sub" style={{ fontSize: 12, marginTop: 6 }}>Showing first 1,000 rows.</p>}
+      </>))}
+      <SpecSection spec={spec} />
+    </div>
+  )
+}
 
 export default function PPCRMSourcing() {
   const fileRef = useRef(null)
@@ -102,6 +301,7 @@ export default function PPCRMSourcing() {
   const [drill, setDrill] = useState(null)
   const [dq, setDq] = useState(null)          // R19 data-quality check
   const [cpFilter, setCpFilter] = useState('all')   // R27 All / Components / Packing
+  const [ruleView, setRuleView] = useState(null)    // open per-rule dashboard
 
   async function load() {
     setLoading(true)
@@ -169,6 +369,20 @@ export default function PPCRMSourcing() {
     .filter(r => cpFilter === 'all' || (cpFilter === 'pack' ? r.type === 'Packing' : r.type !== 'Packing'))
     .filter(r => !s || r.code.toLowerCase().includes(s) || (r.desc || '').toLowerCase().includes(s))
     .sort((a, b) => b.req - a.req)
+
+  // Rules tab — live metrics proving each applied rule, + the tab it drills to.
+  const cpLines = fgs.reduce((a, b) => a + (b.parts ? b.parts.length : 0), 0)
+  const rmKg = rmq.reduce((a, r) => a + N(r.Qty), 0)
+  const manualOverrides = rmq.filter(r => (r['Reqd Qty (in kgs)'] || r['Reqd Qty'] || '').toString().trim()).length
+  const packCount = cp.filter(r => cpType(r['Item Code']) === 'Packing').length
+  const nettedFgs = fgs.filter(b => N(b.fg_demand) || N(b.fg_green) || N(b.fg_opening)).length
+  const liveData = {
+    R20: { stat: `${fmt(fgs.length)} FGs exploded · ${fmt(cpLines)} CP-Req lines`, tab: 'bom' },
+    R21: { stat: `${rmq.length} RM codes · ${fmt(rmKg)} Kg aggregated`, tab: 'rm' },
+    R22: { stat: `${manualOverrides} manual (PPC) overrides of ${rmq.length}`, tab: 'rm' },
+    R23: { stat: `${fmt(nettedFgs)} FGs netted (demand − opening − green)`, tab: 'bom' },
+    R27: { stat: `${fmt(packCount)} packing items (annual job)`, tab: 'cp' },
+  }
 
   return (
     <section className="screen">
@@ -329,55 +543,60 @@ export default function PPCRMSourcing() {
             </>)}
 
             {/* ---------- RULES (static tracker) ---------- */}
-            {view === 'rules' && (<>
+            {view === 'rules' && (ruleView ? <RuleDash ruleId={ruleView} onBack={() => setRuleView(null)} /> : (<>
               <div className="dash-tile-grid">
                 <Tile label="Live" value={ruleCount('live')} kind="score" sub="working in the module" />
                 <Tile label="Partial" value={ruleCount('partial')} kind="warn" sub="started, gaps remain" />
                 <Tile label="Pending" value={ruleCount('pending')} kind="info" sub="awaiting data / build" />
                 <Tile label="Input (upstream)" value={ruleCount('input')} kind="info" sub="from R3SS / MpsSS" />
+                <Tile label="Other module" value={ruleCount('out')} kind="blocked" sub="PPC / Purchase" />
               </div>
               <p className="sub" style={{ fontSize: 13, marginTop: 10 }}>
-                The JCPL operating rules that govern RM Sourcing, grouped by band in build order.
-                Status reflects what the module does today — not the full 29-rule spec.
+                All 29 JCPL operating rules, grouped by band. Open any card for its principle,
+                two worked test cases and the monthly validation check — and its live dashboard
+                where data exists. This tab is the living spec (Rule 28).
               </p>
               {RULE_BANDS.map(band => (
-                <div key={band.band} style={{ marginTop: 18 }}>
-                  <h3 style={{ margin: '0 0 2px', fontSize: 15 }}>{band.band}</h3>
-                  <p className="sub" style={{ fontSize: 12.5, margin: '0 0 10px' }}>{band.note}</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 10 }}>
+                <div key={band.band} className="rule-band">
+                  <h3 className="rule-band-head">{band.band}</h3>
+                  <p className="rule-band-note">{band.note}</p>
+                  <div className="rule-grid">
                     {band.rules.map(r => {
                       const st = STATUS[r.status]
                       return (
-                        <div key={r.id} style={{ border: '1px solid #e2e8f0', borderLeft: `4px solid ${st.dot}`, borderRadius: 8, padding: '10px 12px', background: '#fff' }}>
+                        <div key={r.id} className="rule-card" style={{ borderLeft: `4px solid ${st.dot}`, background: st.tint }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontWeight: 800, fontFamily: 'monospace', fontSize: 13 }}>{r.id}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: st.bg, color: st.fg }}>{st.label}</span>
+                            <span className="rule-id">{r.id}</span>
+                            <span className="rule-badge" style={{ background: st.bg, color: st.fg }}>{st.label}</span>
                           </div>
-                          <div style={{ fontWeight: 700, fontSize: 13.5, margin: '4px 0 2px' }}>{r.title}</div>
+                          <div className="rule-title">{r.title}</div>
                           <div className="sub" style={{ fontSize: 12.5, lineHeight: 1.35 }}>{r.short}</div>
                           <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <span><b>Depends:</b> {r.depends}</span>
                             {r.needs && r.needs !== '—' && <span><b>Needs:</b> {r.needs}</span>}
                           </div>
                           {r.id === 'R19' && dq && dq.ok && (
-                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #e2e8f0', fontSize: 11.5 }}>
-                              <b>Live BOM check:</b> {fmt(dq.total_items)} item codes ·{' '}
-                              <span style={{ color: dq.conflicting_desc_count ? '#e65100' : '#2e7d32', fontWeight: 700 }}>{dq.conflicting_desc_count} conflicting desc.</span> ·{' '}
-                              <span style={{ color: dq.blank_desc_count ? '#e65100' : '#2e7d32', fontWeight: 700 }}>{dq.blank_desc_count} blank desc.</span>
+                            <div style={{ marginTop: 8, fontSize: 11.5 }}>
+                              <b>{fmt(dq.total_items)}</b> codes ·{' '}
+                              <span style={{ color: dq.conflicting_desc_count ? '#e65100' : '#2e7d32', fontWeight: 700 }}>{dq.conflicting_desc_count} conflict</span> ·{' '}
+                              <span style={{ color: dq.blank_desc_count ? '#e65100' : '#2e7d32', fontWeight: 700 }}>{dq.blank_desc_count} blank</span>
                             </div>
                           )}
+                          {liveData[r.id] && (
+                            <div style={{ marginTop: 8, fontSize: 11.5, fontWeight: 700, color: 'var(--steel)' }}>{liveData[r.id].stat}</div>
+                          )}
+                          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed #cbd5e1', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button className="backbtn" style={{ padding: '2px 10px', fontSize: 11 }} onClick={() => setRuleView(r.id)}>
+                              {RULE_DASH[r.id] ? 'Open dashboard →' : 'Open spec →'}
+                            </button>
+                          </div>
                         </div>
                       )
                     })}
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop: 20, padding: '10px 12px', background: '#f7f9fc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12.5, color: 'var(--muted)' }}>
-                <b>Handled by other modules (not RM Sourcing):</b> R4 (Purchase hand-off sheets),
-                R8–R10 (line capacity & manpower — PPC), R12–R18 (vendor management & procurement — Purchase).
-                Shown here only for context — R12 feeds R5 & R24 above.
-              </div>
-            </>)}
+            </>))}
           </>
         )}
       </div>
