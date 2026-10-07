@@ -14,6 +14,7 @@ urlpatterns = [
     path("rm-sourcing/rm-usage/", api_rm_sourcing.rm_usage, name="ppc_data_rm_usage"),
     path("rm-sourcing/rm-by-bom/", api_rm_sourcing.rm_by_bom, name="ppc_data_rm_by_bom"),
     path("rm-sourcing/cp-req/", api_rm_sourcing.cp_req, name="ppc_data_cp_req"),
+    path("rm-sourcing/data-quality/", api_rm_sourcing.data_quality, name="ppc_data_rm_data_quality"),
     # L1 — ERP landing (n8n → Django)
     path("erp-landing/", api.erp_landing, name="ppc_data_erp_landing"),
     # Feed status (admin monitoring)

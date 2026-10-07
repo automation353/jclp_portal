@@ -367,6 +367,39 @@ def repush_bom(chunk=4000):
     return _write_tab_resumable(BOM_TAB, BOM_HEADERS, cache["rows"], chunk=chunk)
 
 
+def check_data_quality():
+    """Rule 19 — one part number, one description. Read-only scan of the cached
+    BOM: find item codes with a blank description and item codes that carry more
+    than one distinct description (duplicates/conflicts). No writes, no recompute.
+    """
+    cache = _load_bom_cache()
+    if not cache:
+        return {"ok": False, "error": "No BOM cached — upload the BOM first."}
+    rows = cache["rows"] if isinstance(cache, dict) else cache
+    desc_by_code = {}          # Item Code -> set of distinct non-blank descriptions
+    blank = set()
+    for r in rows:
+        code = (r.get("Item Code") or "").strip()
+        if not code:
+            continue
+        desc = (r.get("Part Description") or "").replace(" ", " ").strip()
+        if desc:
+            desc_by_code.setdefault(code, set()).add(desc)
+        else:
+            blank.add(code)
+    blank_only = sorted(c for c in blank if c not in desc_by_code)
+    conflicting = sorted(c for c, ds in desc_by_code.items() if len(ds) > 1)
+    return {
+        "ok": True,
+        "total_items": len(set(desc_by_code) | blank),
+        "blank_desc_count": len(blank_only),
+        "conflicting_desc_count": len(conflicting),
+        "blank_desc": blank_only[:50],
+        "conflicting_desc": [{"code": c, "descriptions": sorted(desc_by_code[c])}
+                             for c in conflicting[:50]],
+    }
+
+
 def read_rm_by_bom():
     """Product-centric view (cached): each FG (BOM Code) → its RM needs."""
     path = os.path.join(STATE_DIR, "rm_by_bom.json")

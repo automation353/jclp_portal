@@ -158,6 +158,7 @@ export const api = {
   rmSourcingUsage: (rm) => request(`/ppc-data/rm-sourcing/rm-usage/?rm=${encodeURIComponent(rm)}`),
   rmSourcingByBom: () => request('/ppc-data/rm-sourcing/rm-by-bom/'),
   rmSourcingCpReq: () => request('/ppc-data/rm-sourcing/cp-req/'),
+  rmSourcingDataQuality: () => request('/ppc-data/rm-sourcing/data-quality/'),
   ppcDataTable: (tableKey, limit = 200, search = '') =>
     request(`/ppc-data/table/${tableKey}/?limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}`),
   ppcDataFeedStatus: () => request('/ppc-data/feed-status/'),

@@ -54,6 +54,13 @@ def cp_req(request):
 
 
 @api_view(["GET"])
+def data_quality(request):
+    """Rule 19 — item code ↔ description check over the cached BOM (read-only)."""
+    from .rm_sourcing import check_data_quality
+    return Response(check_data_quality())
+
+
+@api_view(["GET"])
 def rm_usage(request):
     """Which FGs consume a given RM (?rm=<code>)."""
     from .rm_sourcing import read_rm_usage
