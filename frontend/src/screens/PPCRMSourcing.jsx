@@ -171,6 +171,98 @@ const RULE_DASH = {
 }
 const NUMCOL = /qty|requirement|demand|plan|procurement|green|stock|\+10|nos|per kg/i
 
+// Per-code calculation trace — shown for the LIVE/computed rules only. `codeCol`
+// is the clickable column; `usage:true` pulls the SUMIF breakdown (the FG lines
+// that sum to this code); otherwise `rows(row)` gives the row-level arithmetic.
+const CALC = {
+  R20: {
+    codeCol: 'Item Code', formula: 'Qty (Base UOM) = BOM Qty × Qty in Nos ÷ 1000',
+    rows: r => [
+      ['BOM Qty (per 1000)', r['BOM Qty']],
+      ['Qty in Nos (plan)', r['Qty in Nos']],
+      [`= ${r['BOM Qty']} × ${r['Qty in Nos']} ÷ 1000`, r['Qty (Base UOM)']],
+    ],
+    source: 'One CP-Req line, exploded from the BOM against the R3SS plan.',
+  },
+  R21: { codeCol: 'Item Code', usage: true, resultCol: 'Qty',
+    formula: 'Qty = SUMIF — Σ (plan × BOM qty ÷ 1000) over every FG that uses this RM',
+    source: 'Aggregated from the CP Req tab by Item Code.' },
+  R22: { codeCol: 'Item Code', usage: true, resultCol: 'Qty',
+    formula: 'Qty = SUMIF(CP Req). Reqd Qty is a manual PPC override — not computed.',
+    source: 'Computed Qty aggregated from CP Req; Reqd Qty entered by the PPC head.' },
+  R23: {
+    codeCol: 'Item Code', formula: 'Procurement = To Plan − Stock + Green × 0.6',
+    rows: r => [
+      ['To Plan', r['To Plan']],
+      ['Stock', r['Stock'] || '0 (pending Stores feed)'],
+      ['Green Level', r['Green Level']],
+      [`= ${r['To Plan']} − ${N(r['Stock'])} + ${r['Green Level']} × 0.6`, r['Procurement']],
+    ],
+    source: 'To Plan from RM QTY; Green rolled up from R3SS; Stock pending.',
+  },
+  R27: { codeCol: 'Item Code', usage: true, resultCol: 'Qty (Base UOM)',
+    formula: 'Qty (Base UOM) = SUMIF — Σ requirement over every FG that uses this item',
+    source: 'Aggregated from the CP Req tab by Item Code.' },
+}
+
+function SlideOver({ title, onClose, children }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 60, display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: 'min(600px,94vw)', background: '#fff', height: '100%', overflowY: 'auto', padding: 20, boxShadow: '-4px 0 16px rgba(0,0,0,.2)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>{title}</h3>
+          <button className="backbtn" onClick={onClose}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function CalcPanel({ ruleId, code, row, onClose }) {
+  const calc = CALC[ruleId]
+  const [usage, setUsage] = useState(null)
+  const [loading, setLoading] = useState(!!calc.usage)
+  useEffect(() => {
+    if (!calc.usage) return
+    let alive = true; setLoading(true)
+    api.rmSourcingUsage(code).then(d => { if (alive) setUsage(d.rows || []) }).catch(() => { }).finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [code])
+  const total = usage ? usage.reduce((a, u) => a + N(u.requirement), 0) : 0
+  return (
+    <SlideOver title={<span>Calculation · <span style={{ fontFamily: 'monospace' }}>{code}</span></span>} onClose={onClose}>
+      <div style={{ marginTop: 10, padding: '10px 12px', background: '#eef2f7', borderRadius: 8, fontSize: 13, fontWeight: 600, color: 'var(--steel)' }}>{calc.formula}</div>
+      <p className="sub" style={{ fontSize: 12.5, marginTop: 8 }}>{calc.source}</p>
+      {calc.usage ? (
+        loading ? <div>Loading from Google Sheet…</div> : !usage || usage.length === 0 ? <div className="sub">No source lines found.</div> : (<>
+          <div style={{ fontSize: 13, margin: '10px 0 6px' }}>Result = <b>{dec(row[calc.resultCol] || total)}</b> = sum of {usage.length} FG lines below:</div>
+          <table className="mto-table" style={{ width: '100%' }}>
+            <thead><tr><th>FG / BOM Code</th><th className="num">Planned</th><th className="num">× BOM ÷ 1000</th></tr></thead>
+            <tbody>
+              {usage.map((u, i) => <tr key={i}>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{u.bom_code}</td>
+                <td className="num">{fmt(u.planned_qty)}</td>
+                <td className="num">{dec(u.requirement)}</td>
+              </tr>)}
+              <tr><td style={{ fontWeight: 700 }}>Total</td><td></td><td className="num" style={{ fontWeight: 800, color: 'var(--accent)' }}>{dec(total)}</td></tr>
+            </tbody>
+          </table>
+        </>)
+      ) : (
+        <table className="mto-table" style={{ width: '100%', marginTop: 10 }}>
+          <tbody>
+            {calc.rows(row).map(([label, val], i, arr) => <tr key={i} style={i === arr.length - 1 ? { fontWeight: 700 } : undefined}>
+              <td className="mono" style={{ fontSize: 12.5 }}>{label}</td>
+              <td className="num" style={i === arr.length - 1 ? { fontWeight: 800, color: 'var(--accent)' } : undefined}>{val}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      )}
+    </SlideOver>
+  )
+}
+
 function DqView({ dq }) {
   if (!dq || !dq.ok) return <div>No BOM uploaded yet.</div>
   const clean = !dq.conflicting_desc_count && !dq.blank_desc_count
@@ -232,6 +324,8 @@ function RuleDash({ ruleId, onBack }) {
   const [meta, setMeta] = useState({})
   const [loading, setLoading] = useState(!!cfg)
   const [q, setQ] = useState('')
+  const [calc, setCalc] = useState(null)   // per-code calculation trace
+  const calcCfg = CALC[ruleId]
   useEffect(() => {
     if (!cfg) { setLoading(false); return }
     let alive = true; setLoading(true)
@@ -267,6 +361,7 @@ function RuleDash({ ruleId, onBack }) {
       </p>
       {cfg && (loading ? <div>Loading…</div> : cfg.mode === 'dq' ? <DqView dq={dq} /> : (<>
         <div className="dash-tile-grid">{kpis.map((t, i) => <Tile key={i} {...t} />)}</div>
+        {calcCfg && <p className="sub" style={{ fontSize: 12.5, marginTop: 10 }}>💡 Click a code to see how its value was calculated and from which data.</p>}
         <Filters s={q} set={setQ} ph="Search" note={`${shown.length} of ${rows.length} rows · ${srcLabel}`} />
         <div style={{ overflowX: 'auto', marginTop: 10 }}>
           <table className="mto-table" style={{ minWidth: 760 }}>
@@ -274,7 +369,13 @@ function RuleDash({ ruleId, onBack }) {
             <tbody>
               {shown.length === 0 ? <tr><td colSpan={cols.length || 1}>No rows in this sheet tab.</td></tr> :
                 shown.slice(0, 1000).map((r, i) => <tr key={i}>
-                  {cols.map(c => <td key={c} className={NUMCOL.test(c) ? 'num' : (/desc/i.test(c) ? 'desc-wrap' : undefined)} style={/code/i.test(c) ? { fontFamily: 'monospace', fontSize: 12 } : undefined}>{(r[c] || '').toString().replace(/ /g, ' ')}</td>)}
+                  {cols.map(c => {
+                    const val = (r[c] || '').toString().replace(/\u00a0/g, ' ')
+                    if (calcCfg && c === calcCfg.codeCol) return (
+                      <td key={c}><button onClick={() => setCalc(r)} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12, textDecoration: 'underline' }}>{val}</button></td>
+                    )
+                    return <td key={c} className={NUMCOL.test(c) ? 'num' : (/desc/i.test(c) ? 'desc-wrap' : undefined)} style={/code/i.test(c) ? { fontFamily: 'monospace', fontSize: 12 } : undefined}>{val}</td>
+                  })}
                 </tr>)}
             </tbody>
           </table>
@@ -282,6 +383,7 @@ function RuleDash({ ruleId, onBack }) {
         {shown.length > 1000 && <p className="sub" style={{ fontSize: 12, marginTop: 6 }}>Showing first 1,000 rows.</p>}
       </>))}
       <SpecSection spec={spec} />
+      {calc && calcCfg && <CalcPanel ruleId={ruleId} code={calc[calcCfg.codeCol]} row={calc} onClose={() => setCalc(null)} />}
     </div>
   )
 }
