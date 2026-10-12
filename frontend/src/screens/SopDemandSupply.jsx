@@ -117,8 +117,8 @@ export default function SopDemandSupply() {
     setError('')
     api.sopRefresh()
       .then(() => {
-        // Backend starts a background recompute (~20s).
-        // Reload the dashboard after a delay to pick up fresh data.
+        // Backend runs the Django compute engine in the background.
+        // Reload the dashboard after a short delay to pick up fresh data.
         setTimeout(() => {
           load()
           setRefreshing(false)
@@ -275,7 +275,7 @@ export default function SopDemandSupply() {
                       onClick={refresh}
                       disabled={loading || refreshing}
                       style={{ background: '#e67e22', fontSize: 12, padding: '6px 14px' }}
-                      title="Recompute Append1 from Google Sheet source data"
+                      title="Recompute Append1 from the uploaded data (verified engine — matches the reference Dashboard)"
                     >
                       {refreshing ? '⏳ Recomputing…' : '🔄 Recompute'}
                     </button>
