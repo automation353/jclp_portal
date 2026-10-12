@@ -475,10 +475,16 @@ def compute_append1():
     # ── 3. Build Opening Stock lookup (item_code → opening qty, landed rate) ──
     # Only FG-OEM and FG-Fleetguard categories (as per Header Reference)
     opening_lookup = defaultdict(lambda: {"qty": 0.0, "landed_rate": 0.0})
+    # XLOOKUP-style rate: first occurrence per code in sheet order (any
+    # category, value as-is) — this is what the reference uses to value
+    # Excess Opening Stock (₹) = XLOOKUP(code, Opening Stock!G, Opening Stock!BB).
+    opening_first_rate = {}
     for row in opening_rows:
         ic = str(row.get("item_code", "")).strip()
         if not ic:
             continue
+        if ic not in opening_first_rate:
+            opening_first_rate[ic] = _num(row.get("closing_landed_rate", 0))
         cat = str(row.get("item_category", "")).strip()
         if cat not in ("FG- OEM", "FG- Fleetguard"):
             continue
@@ -524,6 +530,7 @@ def compute_append1():
         "production": 0.0,
         "stock_adj_added": 0.0,
         "stock_adj_deducted": 0.0,
+        "prod_value": 0.0,   # net landed value of production (for the DPR rate)
         "item_group": "",
     })
     for row in dpr_rows:
@@ -550,6 +557,13 @@ def compute_append1():
         elif vtype in DPR_PROD_VOUCHERS:
             # Production (Net DPR) = Receipt − Issue on Direct JR / Direct JR Reversal.
             agg["production"] += receipt - issue
+            # Net landed value → used to derive the per-item production rate
+            # (DPR Valuation "Rate" = Value ÷ Qty), which values Production
+            # Surplus (₹) in the reference — NOT the opening landed rate.
+            agg["prod_value"] += (
+                _num(_find_value(row, "receipt_landed_value"))
+                - _num(_find_value(row, "issue_landed_value"))
+            )
         else:
             continue
         if grp and not agg["item_group"]:
@@ -724,12 +738,20 @@ def compute_append1():
 
         # ── Financial impact columns ──
         asp = ASP_TABLE.get(item_group, 0)
-        landed_rate = op["landed_rate"]
+        # Per-item production rate = DPR Valuation "Rate" = net landed value ÷
+        # net production qty.  The reference values Production Surplus (₹) with
+        # THIS rate (XLOOKUP into DPR Valuation), not the opening landed rate.
+        prod_qty_for_rate = dp.get("production", 0)
+        prod_rate = (
+            dp.get("prod_value", 0) / prod_qty_for_rate
+            if prod_qty_for_rate else 0
+        )
 
-        # AH: Surplus Production (₹) = Z × landed_rate
-        surplus_production_val = production_surplus * landed_rate
-        # AI: Excess Opening Stock Value (₹) = AA × landed_rate
-        excess_opening_val = excess_opening_stock * landed_rate
+        # AH: Surplus Production (₹) = Z × production rate (DPR Valuation Rate)
+        surplus_production_val = production_surplus * prod_rate
+        # AI: Excess Opening Stock Value (₹) = AA × first-row Closing Landed Rate
+        # (XLOOKUP into Opening Stock BB — not the FG-filtered aggregate rate).
+        excess_opening_val = excess_opening_stock * opening_first_rate.get(ic, 0)
         # AJ: Build Required = MAX(E + S_gl - J, 0)
         build_required = max(committed_forecast + green_level - opening_inventory, 0)
         # AK: Production Counted = MIN(K, AJ)
