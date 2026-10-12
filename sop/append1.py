@@ -432,16 +432,22 @@ def compute_append1():
     # ── 2. Build Green Level lookup (item_code → type, green_level, family) ──
     green_lookup = {}
     for row in green_rows:
+        g = _num(row.get("green_level", 0))
+        info = {
+            "type": str(row.get("mto_mts", "TBC")).strip().upper(),
+            "green_level": g,
+            "family": str(row.get("family", "")).strip(),
+        }
         # Green Level uses erp_code or jolly_code as the item identifier
         for ic_key in ("erp_code", "jolly_code", "item_code"):
             ic = row.get(ic_key)
             if ic and str(ic).strip() and str(ic).strip() != "0":
                 ic = str(ic).strip()
-                green_lookup[ic] = {
-                    "type": str(row.get("mto_mts", "TBC")).strip().upper(),
-                    "green_level": _num(row.get("green_level", 0)),
-                    "family": str(row.get("family", "")).strip(),
-                }
+                existing = green_lookup.get(ic)
+                # Keep the first match, but never let a blank/zero green row
+                # overwrite a real green value (the tab has duplicate rows).
+                if existing is None or (g > 0 and existing["green_level"] == 0):
+                    green_lookup[ic] = info
 
     # ── 3. Build Opening Stock lookup (item_code → opening qty, landed rate) ──
     # Only FG-OEM and FG-Fleetguard categories (as per Header Reference)
