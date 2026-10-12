@@ -103,6 +103,29 @@ ASP_TABLE = {
 }
 
 
+# ── Focus Product groups (from the reference Sales+Ops Dashboard "Focus" tab) ──
+# The reference classifies an item as "Focus Product" when its ITEM GROUP is one
+# of these; every other item is "Regular".  (Not a per-item-code list.)
+import re as _re
+
+
+def _focus_norm(s):
+    return _re.sub(r"\s+", " ", str(s or "").strip()).lower()
+
+
+FOCUS_GROUPS = {
+    _focus_norm(g) for g in [
+        "12mm 1Way Serrated", "12mm 1Way Spring Insert",
+        "12mm 2Way Serrated", "12mm 2Way Spring Insert",
+        "9mm 2 Way Serrated", "9mm 2 Way Spring Insert",
+        "CAT SLTB", "Coupling", "DPF",
+        "HD CTWD-14mm", "HD CTWD-16mm", "HDWD-14mm", "HDWD-16mm",
+        "Stepless", "VTB & QVTB", "VWD Clamps", "Clamp with Key",
+        "Barrel Clamps", "TB-32mm", "Strap Clamps", "Waveseal SFC",
+    ]
+}
+
+
 # ── Insight tag / narrative generators ──────────────────────────────────
 # Implements the Insight Logic Master trigger rules from the Google Sheet.
 
@@ -580,7 +603,14 @@ def compute_append1():
                       or dp.get("item_group") or gl.get("family", ""))
         if not str(item_group).strip():
             continue  # reference Append1 filters out rows with no Item Group
-        product_class = "Regular"  # default; Focus items TBD from a separate flag
+        # Product Class: "Focus Product" when the Item Group is one of the
+        # reference Focus-tab groups, else "Regular" (matches the reference,
+        # which classifies by GROUP — not by item code).
+        product_class = (
+            "Focus Product"
+            if _focus_norm(item_group) in FOCUS_GROUPS
+            else "Regular"
+        )
 
         # D: Original Forecast
         original_forecast = fc.get("forecast_qty", 0)

@@ -1515,6 +1515,18 @@ def demand_supply_overview(request):
     # COMMON PATH: both snapshot and legacy paths merge here.
     # all_items + total_items are set by whichever path ran.
     # ══════════════════════════════════════════════════════════════════
+    # Authoritative Focus/Regular classification — by ITEM GROUP, matching the
+    # reference Dashboard's "Focus" tab (a list of groups, not item codes).
+    # This runs once for both paths, after item_group is finalised, so it
+    # supersedes any earlier per-code guesses.
+    from .append1 import FOCUS_GROUPS as _FOCUS_GROUPS, _focus_norm as _fnorm
+    for _it in all_items:
+        _it["product_class"] = (
+            "Focus Product"
+            if _fnorm(_it.get("item_group", "")) in _FOCUS_GROUPS
+            else "Regular"
+        )
+
     focus_items = [i for i in all_items
                    if "focus" in str(i.get("product_class", "")).lower()]
     regular_items = [i for i in all_items
