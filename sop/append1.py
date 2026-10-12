@@ -28,7 +28,7 @@ Column layout mirrors the Google Sheet ``Append1`` tab:
 """
 
 import logging
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 log = logging.getLogger(__name__)
 
@@ -393,6 +393,42 @@ def compute_append1():
     if not any([dpr_rows, forecast_rows, opening_rows, green_rows, sales_rows]):
         return []
 
+    # ── 1b. Detect the reporting window from the data (mirrors the reference
+    # Power Query filters) so raw ERP exports are reduced to the same subset
+    # the Sales+Ops Dashboard is built on. ──
+    def _month_mode(rows, *datecols):
+        c = Counter()
+        for r in rows:
+            for dc in datecols:
+                v = r.get(dc)
+                if v:
+                    c[str(v)[:7]] += 1
+                    break
+        return c.most_common(1)[0][0] if c else None
+
+    def _date_mode(rows, datecol, predicate=None):
+        c = Counter()
+        for r in rows:
+            if predicate and not predicate(r):
+                continue
+            v = r.get(datecol)
+            if v:
+                c[str(v)[:10]] += 1
+        return c.most_common(1)[0][0] if c else None
+
+    DPR_MONTH = _month_mode(dpr_rows, "document_date")              # e.g. 2026-09
+    SALES_MONTH = _month_mode(sales_rows, "invoice_date")
+    # Original-forecast snapshot = the dominant Forecast Date among Party/Monthly rows.
+    FC_SNAPSHOT = _date_mode(
+        forecast_rows, "forecast_date",
+        lambda r: str(r.get("forecast_level", "")).strip() == "Party"
+        and str(r.get("forecast_type", "")).strip() == "Monthly",
+    )
+    FG_CATS = {"FG- OEM", "FG- Fleetguard"}
+    SALES_PARTIES = {"JCPL-Non Auto OEMS", "JCPL-OEM"}
+    DPR_PROD_VOUCHERS = {"direct jr", "direct jr reversal"}
+    log.info("Append1 window: DPR=%s SALES=%s FC_SNAPSHOT=%s", DPR_MONTH, SALES_MONTH, FC_SNAPSHOT)
+
     # ── 2. Build Green Level lookup (item_code → type, green_level, family) ──
     green_lookup = {}
     for row in green_rows:
@@ -425,20 +461,33 @@ def compute_append1():
         if rate > 0 and entry["landed_rate"] == 0:
             entry["landed_rate"] = rate
 
-    # ── 4. Aggregate Forecast (per item_code) ──
-    forecast_agg = defaultdict(lambda: {
-        "forecast_qty": 0.0,
-        "order_qty": 0.0,
-        "shipment_qty": 0.0,
-    })
+    # ── 4. Aggregate Forecast (per item_code) — reference Power Query rules ──
+    # Original Forecast  = Forecast Qty where Level=Party, Type=Monthly, Date=snapshot.
+    # Actual Demand      = Forecast Qty where Level=Party (all types/dates),
+    #                      Quarterly made negative. (NOT total_order_qty — that
+    #                      column carries 999,999,999 sentinels.)
+    forecast_agg = defaultdict(lambda: {"forecast_qty": 0.0, "item_group": ""})
+    demand_agg = defaultdict(float)
     for row in forecast_rows:
         ic = str(row.get("item_code", "")).strip()
         if not ic:
             continue
-        agg = forecast_agg[ic]
-        agg["forecast_qty"] += _num(row.get("forecast_qty", 0))
-        agg["order_qty"] += _num(row.get("total_order_qty_base_uom", 0))
-        agg["shipment_qty"] += _num(row.get("total_shipment_qty_base_uom", 0))
+        level = str(row.get("forecast_level", "")).strip()
+        if level != "Party":
+            continue
+        ftype = str(row.get("forecast_type", "")).strip()
+        qty = _num(row.get("forecast_qty", 0))
+
+        # Original Forecast — Monthly at the committed snapshot date
+        if ftype == "Monthly" and (not FC_SNAPSHOT or str(row.get("forecast_date", ""))[:10] == FC_SNAPSHOT):
+            fa = forecast_agg[ic]
+            fa["forecast_qty"] += qty
+            grp = _find_value(row, "item_group", "item_class")
+            if grp and not fa["item_group"]:
+                fa["item_group"] = str(grp).strip()
+
+        # Actual Demand — all Party rows, Quarterly negated
+        demand_agg[ic] += (-abs(qty) if ftype == "Quarterly" else qty)
 
     # ── 5. Aggregate DPR / Stock Ledger (per item_code) ──
     # Production = receipt_qty, Stock adjustments from trading items
@@ -452,28 +501,30 @@ def compute_append1():
         ic = str(_find_value(row, "item_code", "item_no") or "").strip()
         if not ic:
             continue
+        # Reference filters: previous month · FG-OEM / FG-Fleetguard · exclude Coupling
+        if DPR_MONTH and str(row.get("document_date", ""))[:7] != DPR_MONTH:
+            continue
+        if str(row.get("item_category", "")).strip() not in FG_CATS:
+            continue
+        grp = str(_find_value(row, "item_group", "item_category", "group") or "").strip()
+        if grp == "Coupling":
+            continue
+        vtype_raw = str(row.get("voucher_type", "")).strip()
+        vtype = vtype_raw.lower()
+        receipt = _num(_find_value(row, "receipt_qty", "receipt_quantity", "production_qty", "inward_qty"))
+        issue = _num(_find_value(row, "issue_qty", "issue_quantity", "dispatch_qty", "outward_qty"))
         agg = dpr_agg[ic]
-
-        receipt = _num(_find_value(
-            row, "receipt_qty", "receipt_quantity",
-            "production_qty", "inward_qty"))
-        issue = _num(_find_value(
-            row, "issue_qty", "issue_quantity",
-            "dispatch_qty", "outward_qty"))
-
-        # Classify by voucher type
-        vtype = str(row.get("voucher_type", "")).lower()
-        if "transfer" in vtype or "trading" in vtype:
-            # Stock adjustments (trading item conversions)
+        if vtype == "tradingitemconversion":
+            # Trading-item conversions are stock adjustments, not production.
             agg["stock_adj_added"] += receipt
             agg["stock_adj_deducted"] += issue
+        elif vtype in DPR_PROD_VOUCHERS:
+            # Production (Net DPR) = Receipt − Issue on Direct JR / Direct JR Reversal.
+            agg["production"] += receipt - issue
         else:
-            # Regular production receipts
-            agg["production"] += receipt
-
-        grp = _find_value(row, "item_group", "item_category", "group")
+            continue
         if grp and not agg["item_group"]:
-            agg["item_group"] = str(grp).strip()
+            agg["item_group"] = grp
 
     # ── 6. Aggregate Sales Register (per item_code) ──
     sales_agg = defaultdict(lambda: {"dispatch": 0.0, "item_group": ""})
@@ -481,21 +532,27 @@ def compute_append1():
         ic = str(row.get("item_code", "")).strip()
         if not ic:
             continue
-        # Use item_base_qty as the dispatch quantity
-        qty = _num(_find_value(
-            row, "item_base_qty", "item_sales_qty",
-            "item_bill_qty", "qty", "quantity"))
+        # Reference filters: previous month · Invoice Status = Exported To GL ·
+        # Party A/C in {JCPL-Non Auto OEMS, JCPL-OEM}.
+        if SALES_MONTH and str(row.get("invoice_date", ""))[:7] != SALES_MONTH:
+            continue
+        if str(row.get("invoice_status", "")).strip() != "Exported To GL":
+            continue
+        if str(row.get("party_a_c_description", "")).strip() not in SALES_PARTIES:
+            continue
+        qty = _num(_find_value(row, "item_sales_qty", "item_base_qty", "item_bill_qty", "qty", "quantity"))
         sales_agg[ic]["dispatch"] += qty
         grp = _find_value(row, "item_group", "item_group_description")
         if grp and not sales_agg[ic]["item_group"]:
             sales_agg[ic]["item_group"] = str(grp).strip()
 
     # ── 7. Build the universe of item codes ──
+    # Reference Append1 = union of Original-Forecast, DPR and Sales items
+    # (Opening / Green / Actual-Demand are looked up, not part of the universe).
     all_codes = set()
     all_codes.update(forecast_agg.keys())
-    all_codes.update(ic for ic in dpr_agg if dpr_agg[ic]["production"] > 0)
-    all_codes.update(ic for ic in sales_agg if sales_agg[ic]["dispatch"] > 0)
-    all_codes.update(ic for ic in opening_lookup if opening_lookup[ic]["qty"] > 0)
+    all_codes.update(ic for ic in dpr_agg if dpr_agg[ic]["production"])
+    all_codes.update(ic for ic in sales_agg if sales_agg[ic]["dispatch"])
 
     log.info(
         "Append1: %d item codes (forecast=%d, dpr=%d, sales=%d, opening=%d, green=%d)",
@@ -513,7 +570,10 @@ def compute_append1():
         gl = green_lookup.get(ic, {"type": "TBC", "green_level": 0, "family": ""})
 
         # ── Source columns ──
-        item_group = sa.get("item_group") or dp.get("item_group") or gl.get("family", "")
+        item_group = (fc.get("item_group") or sa.get("item_group")
+                      or dp.get("item_group") or gl.get("family", ""))
+        if not str(item_group).strip():
+            continue  # reference Append1 filters out rows with no Item Group
         product_class = "Regular"  # default; Focus items TBD from a separate flag
 
         # D: Original Forecast
@@ -522,9 +582,10 @@ def compute_append1():
         committed_forecast = original_forecast
         # F: Ops Adjustment = E - D
         ops_adjustment = committed_forecast - original_forecast
-        # G: Actual Sales Demand — use order_qty if available, else committed
-        order_qty = fc.get("order_qty", 0)
-        actual_sales_demand = order_qty if order_qty > 0 else committed_forecast
+        # G: Actual Sales Demand — the Party-level forecast demand feed
+        # (all types, Quarterly negated); 0 when the item has no demand row
+        # (matches the reference — no fallback to committed forecast).
+        actual_sales_demand = demand_agg.get(ic, 0)
         # H: Additional Demand = G - D
         additional_demand = actual_sales_demand - original_forecast
         # Direction indicator for narratives (positive = committed lower)
