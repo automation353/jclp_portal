@@ -249,61 +249,29 @@ def upload(request):
     # Background thread so the upload response returns immediately.
     #
     # Full chain:
-    #   1. Push source data to Google Sheet via n8n webhook
-    #   2. Trigger Apps Script computeAppend1 (recompute from all tabs)
-    #   3. Wait for computation, then pull fresh Append1 CSV back
-    #   4. Save as local snapshot so the dashboard is immediately current
-    #   5. Trigger summaryOnly for summary tabs
+    #   1. Push source data to Google Sheet (keeps the raw tabs current)
+    #   2. Recompute Append1 with the VERIFIED Django engine, save the
+    #      local snapshot, and push Append1 to the Google Sheet.
     #
-    # If the Google Sheet path fails at any step, fall back to Django's
-    # local compute_append1() so the dashboard still updates.
+    # The Django compute_append1() engine is the single source of truth:
+    # it reproduces the reference Dashboard to the unit.  The Apps Script
+    # computeAppend1 engine is intentionally NOT used here — it diverged
+    # from the reference on several columns and caused recurring mismatches.
     def _bg_sync(batch_pk, tk):
-        import time
-        from .sheet_sync import (
-            sync_sop_upload, trigger_full_refresh,
-            trigger_compute_append1, pull_append1_snapshot,
-        )
+        from .sheet_sync import sync_sop_upload
         try:
             from ppc_data.models import PPCUploadBatch as Batch
             b = Batch.objects.get(pk=batch_pk)
 
-            # Step 1: Sync source data to Google Sheet
+            # Step 1: Sync source data to Google Sheet (record / raw tabs)
             result = sync_sop_upload(b)
             log.info("S&OP sheet sync for %s: %s", tk, result)
 
-            snapshot_ok = False
-
-            if result.get("ok"):
-                # Step 2: Trigger Apps Script to recompute Append1
-                compute = trigger_compute_append1()
-                log.info("S&OP computeAppend1 after %s: %s", tk, compute)
-
-                if compute.get("ok"):
-                    # Step 3: Wait for Apps Script to finish (typically 5-15s)
-                    time.sleep(15)
-
-                    # Step 4: Pull fresh Append1 back and save as snapshot
-                    snap = pull_append1_snapshot()
-                    log.info("S&OP snapshot pull after %s: %s", tk, snap)
-                    snapshot_ok = snap.get("ok", False)
-
-                # Step 5: Regenerate summary tabs
-                refresh = trigger_full_refresh()
-                log.info("S&OP summaryOnly after %s: %s", tk, refresh)
-
-            # Fallback: if sheet-based refresh didn't produce a snapshot,
-            # compute locally from the database and save as snapshot.
-            if not snapshot_ok:
-                log.info("S&OP: sheet path incomplete for %s, computing locally", tk)
-                _local_compute_and_save_snapshot()
-
-            # Auto-save monthly archive after successful Append1 update
-            try:
-                from .archive import save_monthly_snapshot, freeze_past_months
-                freeze_past_months()   # lock any past-month snapshots
-                save_monthly_snapshot()
-            except Exception:
-                log.exception("Monthly snapshot auto-save failed (non-blocking)")
+            # Step 2: Compute with the Django engine, save snapshot, push
+            # Append1 to the sheet.  (_local_compute_and_save_snapshot also
+            # auto-saves the monthly archive.)
+            _local_compute_and_save_snapshot()
+            log.info("S&OP Django compute + snapshot done for %s", tk)
 
         except Exception:
             log.exception("S&OP bg sync failed for %s (non-blocking)", tk)
@@ -698,39 +666,20 @@ def refresh_append1(request):
 
     POST /api/sop/refresh/
 
-    Runs the same chain as the upload-completion hook:
-      1. Trigger Apps Script computeAppend1
-      2. Pull fresh Append1 CSV back from Google Sheet
-      3. Save as local snapshot
+    Recomputes Append1 with the VERIFIED Django engine, saves the local
+    snapshot, and pushes Append1 to the Google Sheet.  This is the single
+    source of truth (matches the reference Dashboard to the unit); the
+    Apps Script computeAppend1 engine is intentionally not used.
 
     Returns immediately — the recompute runs in a background thread.
     The next dashboard load will pick up the fresh data.
     """
-    import time as _time
 
     def _bg_refresh():
-        from .sheet_sync import (
-            trigger_compute_append1, pull_append1_snapshot,
-            trigger_full_refresh,
-        )
         try:
-            compute = trigger_compute_append1()
-            log.info("Manual refresh — computeAppend1: %s", compute)
-            if compute.get("ok"):
-                _time.sleep(15)
-                snap = pull_append1_snapshot()
-                log.info("Manual refresh — snapshot pull: %s", snap)
-            refresh = trigger_full_refresh()
-            log.info("Manual refresh — summaryOnly: %s", refresh)
-
-            # Auto-save monthly archive
-            try:
-                from .archive import save_monthly_snapshot, freeze_past_months
-                freeze_past_months()
-                save_monthly_snapshot()
-            except Exception:
-                log.exception("Monthly snapshot auto-save failed (non-blocking)")
-
+            # Django compute + snapshot + sheet push + monthly archive.
+            _local_compute_and_save_snapshot()
+            log.info("Manual refresh — Django compute + snapshot done")
         except Exception:
             log.exception("Manual refresh failed (non-blocking)")
 
