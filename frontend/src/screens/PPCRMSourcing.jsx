@@ -53,7 +53,7 @@ const RULE_BANDS = [
     band: 'Part E — Inventory levels',
     note: 'Net the requirement against stock & green levels → procurement.',
     rules: [
-      { id: 'R23', title: 'Green hierarchy FG → child → RM', short: 'FG-level netting shown in By Product (demand − opening − green); RM-tier stock netting pending.', status: 'partial', depends: 'R21, R1', needs: 'RM opening stock, child-part green, safety buffer (Stores/PPC)' },
+      { id: 'R23', title: 'Green hierarchy FG → child → RM', short: 'Multi-level FG→CP→RM roll-up live in By Product (RM direct + via CPs); FG plan netting is upstream in R3SS. RM-tier stock netting pending.', status: 'partial', depends: 'R21, R1', needs: 'RM opening stock, child-part green, safety buffer (Stores/PPC)' },
       { id: 'R24', title: 'In-house CP & critical RM at green; vendor CP differs', short: 'No RM green for vendor CP; critical RM (wire/coil) always in-house.', status: 'pending', depends: 'R12 (vendor commitment)', needs: 'In-house vs vendor CP list (Production/Purchase)' },
       { id: 'R25', title: 'Refill green level; customer-specific FG', short: 'Refill is a procurement trigger on the Order-now list.', status: 'pending', depends: 'R23', needs: 'Customer FG ratios, transport batch (Sales/Logistics)' },
       { id: 'R26', title: 'Size levels from sales data / turnover', short: 'Replaces 3-month averages; RM ≈ 60% of cost. LPP optional.', status: 'pending', depends: 'R2', needs: 'Clean sales history, cost structure (Sales/Finance)' },
@@ -477,12 +477,12 @@ export default function PPCRMSourcing() {
   const rmKg = rmq.reduce((a, r) => a + N(r.Qty), 0)
   const manualOverrides = rmq.filter(r => (r['Reqd Qty (in kgs)'] || r['Reqd Qty'] || '').toString().trim()).length
   const packCount = cp.filter(r => cpType(r['Item Code']) === 'Packing').length
-  const nettedFgs = fgs.filter(b => N(b.fg_demand) || N(b.fg_green) || N(b.fg_opening)).length
+  const viaCpFgs = fgs.filter(b => N(b.rm_via_cp)).length
   const liveData = {
     R20: { stat: `${fmt(fgs.length)} FGs exploded · ${fmt(cpLines)} CP-Req lines`, tab: 'bom' },
     R21: { stat: `${rmq.length} RM codes · ${fmt(rmKg)} Kg aggregated`, tab: 'rm' },
     R22: { stat: `${manualOverrides} manual (PPC) overrides of ${rmq.length}`, tab: 'rm' },
-    R23: { stat: `${fmt(nettedFgs)} FGs netted (demand − opening − green)`, tab: 'bom' },
+    R23: { stat: `FG→CP→RM hierarchy · ${fmt(viaCpFgs)} FGs roll RM via CPs`, tab: 'bom' },
     R27: { stat: `${fmt(packCount)} packing items (annual job)`, tab: 'cp' },
   }
 
@@ -550,14 +550,11 @@ export default function PPCRMSourcing() {
                             <td className="num">{nRm + nCp} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({nRm} RM / {nCp} CP)</span></td>
                           </tr>,
                           o && <tr key={r.bom_code + '_x'}><td></td><td colSpan={7} style={{ background: '#f7fafc', padding: '6px 10px' }}>
-                            {/* R23 — FG-level netting (from R3SS): demand − (opening + green) → plan */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, fontSize: 12, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #e2e8f0' }}>
-                              <span style={{ fontWeight: 700, color: '#455a64' }}>FG netting (R23):</span>
-                              <span>Demand <b>{fmt(r.fg_demand)}</b></span>
-                              <span>Opening <b>{fmt(r.fg_opening)}</b></span>
-                              <span>FG Stock <b>{fmt(r.fg_stock)}</b></span>
-                              <span>Green <b>{fmt(r.fg_green)}</b></span>
-                              <span style={{ color: '#0a5fa5' }}>→ Planned <b>{fmt(r.planned)}</b></span>
+                            {/* Planned FG Qty is a read-only INPUT from R3SS (its calculation
+                                — demand/safety/FG/WIP/EBQ — lives in the R3SS dashboard, not here). */}
+                            <div style={{ fontSize: 12, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #e2e8f0', color: '#455a64' }}>
+                              <b>Planned FG Qty (from R3SS): {fmt(r.planned)}</b>
+                              <span style={{ color: 'var(--muted)' }}> — input to this dashboard; BOM explodes against it below.</span>
                             </div>
                             <table style={{ width: '100%', fontSize: 13 }}><tbody>
                               {parts.map((m, j) => <tr key={j}>
