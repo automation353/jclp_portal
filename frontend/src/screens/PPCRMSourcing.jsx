@@ -572,15 +572,31 @@ export default function PPCRMSourcing() {
                                 </td>
                                 <td style={{ textAlign: 'right', padding: '2px 8px', whiteSpace: 'nowrap' }}>{dec(m.req)} {m.uom}</td>
                               </tr>)}
-                              {/* R21 — CP Req and RM Req linked numerically for this FG */}
+                              {/* R21 — multi-level roll-up: RM direct + RM via CP = RM total */}
                               <tr style={{ borderTop: '2px solid #cbd5e0' }}>
-                                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#1565c0' }}>RM Req total →</td>
-                                <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#1565c0', whiteSpace: 'nowrap' }}>{fmt(r.rm_demand)} Kg</td>
+                                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', color: '#1565c0' }}>RM used directly in FG →</td>
+                                <td style={{ textAlign: 'right', padding: '4px 8px', color: '#1565c0', whiteSpace: 'nowrap' }}>{fmt(r.rm_demand)} Kg</td>
+                              </tr>
+                              <tr>
+                                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', color: '#8e24aa' }}>RM via its CPs (R21) →</td>
+                                <td style={{ textAlign: 'right', padding: '4px 8px', color: '#8e24aa', whiteSpace: 'nowrap' }}>
+                                  {fmt(r.rm_via_cp || 0)} Kg
+                                  {(r.rm_via_cp_parts && r.rm_via_cp_parts.length > 0) &&
+                                    <span style={{ color: 'var(--muted)', fontSize: 11 }}> &nbsp;({r.rm_via_cp_parts.length} RM codes)</span>}
+                                </td>
+                              </tr>
+                              <tr style={{ borderTop: '1px solid #cbd5e0' }}>
+                                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#0a5fa5' }}>RM TOTAL to procure →</td>
+                                <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#0a5fa5', whiteSpace: 'nowrap' }}>{fmt(r.rm_total ?? r.rm_demand)} Kg</td>
                               </tr>
                               <tr>
                                 <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#6a1b9a' }}>CP Req total →</td>
                                 <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#6a1b9a', whiteSpace: 'nowrap' }}>{fmt(r.cp_demand)} Nos</td>
                               </tr>
+                              {(r.rm_via_cp_parts && r.rm_via_cp_parts.length > 0) &&
+                                <tr><td colSpan={4} style={{ padding: '4px 8px 8px', fontSize: 11, color: '#8e24aa', background: '#faf5fc' }}>
+                                  <b>RM reached via CPs:</b> {r.rm_via_cp_parts.map(p => `${p.code} (${dec(p.req)} ${p.uom})`).join(' · ')}
+                                </td></tr>}
                             </tbody></table>
                           </td></tr>,
                         ]

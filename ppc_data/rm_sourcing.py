@@ -570,8 +570,53 @@ def compute_rm(qty_field="to_plan"):
 
     plan_by_code = {p["BOM Code"].strip().upper(): p for p in plan_rows}
 
+    # ── Multi-level CP → RM index (Rule 21) ──────────────────────────────
+    # A CP's own recipe lives in the SAME BOM, as a P1-prefixed parent of the
+    # CP code (child "CPCAP516SS304" ↔ parent "P1CPCAP516SS304"). Index every
+    # parent by its P1-stripped code so any part can be looked up, then resolve
+    # a CP down to the RM it consumes — recursively, because a CP can be built
+    # from another CP — memoised per code and guarded against cycles.
+    bom_index = {}
+    for _ln in cache["rows"]:
+        _k = _strip_p1(str(_ln["BOM Code"]).strip()).upper()
+        bom_index.setdefault(_k, []).append((
+            str(_ln["Item Code"]).strip(),
+            _num(_ln["BOM Qty (per 1000)"]),
+            _ln.get("UOM", ""), _ln.get("Part Description", ""),
+        ))
+
+    _cp_rm_unit = {}   # CP code (upper) -> {rm_code: {"req": rm_per_1_cp, "desc", "uom"}}
+
+    def _resolve_cp_to_rm(code, _stack=None, _depth=0):
+        """RM consumed per ONE unit of `code`, exploding nested CPs to RM."""
+        key = str(code).strip().upper()
+        if key in _cp_rm_unit:
+            return _cp_rm_unit[key]
+        if _stack is None:
+            _stack = set()
+        out = {}
+        if _depth > 12 or key in _stack:
+            if key in _stack:
+                log.warning("RMCP CP→RM cycle at %s — branch skipped", key)
+            return out                      # don't cache a cycle-cut branch
+        kids = bom_index.get(key)
+        if kids:
+            stack = _stack | {key}
+            for _child, _q1000, _uom, _desc in kids:
+                per = _q1000 / 1000.0        # per 1 unit of this part
+                if _is_rm(_child):
+                    e = out.setdefault(_child, {"req": 0.0, "desc": _desc, "uom": _uom})
+                    e["req"] += per
+                else:                        # nested CP → recurse
+                    for rc, rv in _resolve_cp_to_rm(_child, stack, _depth + 1).items():
+                        e = out.setdefault(rc, {"req": 0.0, "desc": rv["desc"], "uom": rv["uom"]})
+                        e["req"] += per * rv["req"]
+        _cp_rm_unit[key] = out
+        return out
+
     cp_rows = []
     rm_agg = {}       # RM code -> {desc, uom, req(to_plan), demand(total), green}
+    rm_cp_agg = {}    # RM code -> {desc, uom, req}  — RM reached VIA CPs (Rule 21)
     cp_agg = {}       # CP/packing code -> {desc, uom, req}
     by_bom = {}       # BOM Code (FG) -> its RM needs (product-centric view)
     matched_parents = set()
@@ -616,7 +661,9 @@ def compute_rm(qty_field="to_plan"):
                       "fg_stock": round(fi.get("fg_stock", 0.0)),
                       "fg_green": round(fi.get("green", 0.0)),
                       "rm_demand": 0.0, "cp_demand": 0.0,
-                      "rm_count": 0, "cp_count": 0, "parts": []}
+                      "rm_via_cp": 0.0,          # RM reached via this FG's CPs
+                      "rm_count": 0, "cp_count": 0, "parts": [],
+                      "_rm_via_cp_map": {}}
                 by_bom[pkey] = bb
             if req > 0:
                 bb["parts"].append({"code": child, "desc": desc, "uom": uom,
@@ -627,6 +674,16 @@ def compute_rm(qty_field="to_plan"):
                 else:
                     bb["cp_demand"] += req
                     bb["cp_count"] += 1
+                    # Rule 21 — RM this CP consumes (exploded to RM, recursive)
+                    for rc, rv in _resolve_cp_to_rm(child).items():
+                        add = req * rv["req"]
+                        if add <= 0:
+                            continue
+                        bb["rm_via_cp"] += add
+                        vm = bb["_rm_via_cp_map"].setdefault(
+                            rc, {"code": rc, "desc": rv["desc"], "uom": rv["uom"],
+                                 "req": 0.0})
+                        vm["req"] += add
         if is_rm:
             a = rm_agg.get(child)
             if a is None:
@@ -641,6 +698,16 @@ def compute_rm(qty_field="to_plan"):
                 a = {"desc": desc, "uom": uom, "req": 0.0}
                 cp_agg[child] = a
             a["req"] += req
+            # Rule 21 — global roll-up of RM reached via this CP requirement
+            for rc, rv in _resolve_cp_to_rm(child).items():
+                add = req * rv["req"]
+                if add <= 0:
+                    continue
+                a2 = rm_cp_agg.get(rc)
+                if a2 is None:
+                    a2 = {"desc": rv["desc"], "uom": rv["uom"], "req": 0.0}
+                    rm_cp_agg[rc] = a2
+                a2["req"] += add
 
     # RM Req = the line-level RM explosion (one row per FG → RM), with the same
     # columns as the reference RM Req / CP Req. The aggregated RM total per code
@@ -713,8 +780,19 @@ def compute_rm(qty_field="to_plan"):
     # Cache the product-centric (by BOM Code) RM view for the dashboard.
     by_bom_list = sorted(by_bom.values(), key=lambda b: -b["rm_demand"])
     for b in by_bom_list:
+        # Rule 21 — finalise the multi-level roll-up per FG:
+        #   rm_demand  = RM used directly in the FG
+        #   rm_via_cp  = RM used to make this FG's CPs (exploded to RM)
+        #   rm_total   = total RM to procure for this FG
+        via_map = b.pop("_rm_via_cp_map", {})
+        b["rm_via_cp_parts"] = sorted(
+            [{"code": v["code"], "desc": v["desc"], "uom": v["uom"],
+              "req": round(v["req"], 2)} for v in via_map.values()],
+            key=lambda x: -x["req"])
         b["rm_demand"] = round(b["rm_demand"], 2)
         b["cp_demand"] = round(b["cp_demand"], 2)
+        b["rm_via_cp"] = round(b["rm_via_cp"], 2)
+        b["rm_total"] = round(b["rm_demand"] + b["rm_via_cp"], 2)
         # RM parts first, then the rest, each by descending requirement.
         b["parts"].sort(key=lambda x: (0 if x["rm"] else 1, -x["req"]))
     try:
@@ -726,9 +804,16 @@ def compute_rm(qty_field="to_plan"):
     log.info("RM compute: %d planned parents, %d CP lines, %d RM lines, %d RM codes, %d CP/PKG | qty=%s",
              len(matched_parents), len(cp_rows), len(rm_req_rows),
              len(rm_qty_rows), len(qty_sheet_rows), qty_field)
+    rm_direct_total = sum(a["req"] for a in rm_agg.values())
+    rm_via_cp_total = sum(a["req"] for a in rm_cp_agg.values())
     return {"ok": all(w.get("ok") for w in writes.values()),
             "planned_parents": len(matched_parents),
             "cp_required_rows": len(cp_rows), "rm_req_lines": len(rm_req_rows),
             "rm_items": len(rm_qty_rows),
             "cp_pkg_items": len(qty_sheet_rows), "qty_field": qty_field,
+            # Rule 21 multi-level roll-up (direct RM + RM via CPs = total RM)
+            "rm_direct_total": round(rm_direct_total, 2),
+            "rm_via_cp_total": round(rm_via_cp_total, 2),
+            "rm_total": round(rm_direct_total + rm_via_cp_total, 2),
+            "rm_via_cp_codes": len(rm_cp_agg),
             "writes": {k: (v.get("ok"), v.get("rows_written")) for k, v in writes.items()}}
