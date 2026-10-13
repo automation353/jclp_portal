@@ -523,6 +523,7 @@ export default function PPCRMSourcing() {
             {view === 'bom' && (<>
               <div className="dash-tile-grid">
                 <Tile label="Total RM Demand" value={fmt(fgs.reduce((a, r) => a + N(r.rm_demand), 0))} unit="Kg" kind="info" />
+                <Tile label="Total CP Demand" value={fmt(fgs.reduce((a, r) => a + N(r.cp_demand), 0))} unit="Nos" kind="score" />
                 <Tile label="Products (FGs)" value={fgs.length} kind="score" />
                 <Tile label="RM Items" value={rmq.length} kind="info" />
                 <Tile label="CP / Packing Items" value={cp.length} kind="score" />
@@ -530,9 +531,9 @@ export default function PPCRMSourcing() {
               <Filters s={search} set={setSearch} ph="Search BOM code / family / customer" note={`${fgF.length} products`} />
               <div style={{ overflowX: 'auto', marginTop: 10 }}>
                 <table className="mto-table" style={{ minWidth: 800 }}>
-                  <thead><tr><th></th><th>BOM Code</th><th>Family</th><th>Customer</th><th className="num">Planned FG Qty</th><th className="num">RM Demand (Kg)</th><th className="num">BOM Parts</th></tr></thead>
+                  <thead><tr><th></th><th>BOM Code</th><th>Family</th><th>Customer</th><th className="num">Planned FG Qty</th><th className="num">RM Demand (Kg)</th><th className="num">CP Demand (Nos)</th><th className="num">BOM Parts</th></tr></thead>
                   <tbody>
-                    {fgF.length === 0 ? <tr><td colSpan={7}>No data — upload the BOM, then Recompute.</td></tr> :
+                    {fgF.length === 0 ? <tr><td colSpan={8}>No data — upload the BOM, then Recompute.</td></tr> :
                       fgF.map(r => {
                         const o = open.has(r.bom_code)
                         const parts = r.parts || r.rms || []
@@ -544,10 +545,11 @@ export default function PPCRMSourcing() {
                             <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.bom_code}</td>
                             <td>{r.family}</td><td>{r.customer}</td>
                             <td className="num">{fmt(r.planned)}</td>
-                            <td className="num" style={{ fontWeight: 700 }}>{fmt(r.rm_demand)}</td>
+                            <td className="num" style={{ fontWeight: 700, color: '#1565c0' }}>{fmt(r.rm_demand)}</td>
+                            <td className="num" style={{ fontWeight: 700, color: '#6a1b9a' }}>{fmt(r.cp_demand)}</td>
                             <td className="num">{nRm + nCp} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({nRm} RM / {nCp} CP)</span></td>
                           </tr>,
-                          o && <tr key={r.bom_code + '_x'}><td></td><td colSpan={6} style={{ background: '#f7fafc', padding: '6px 10px' }}>
+                          o && <tr key={r.bom_code + '_x'}><td></td><td colSpan={7} style={{ background: '#f7fafc', padding: '6px 10px' }}>
                             {/* R23 — FG-level netting (from R3SS): demand − (opening + green) → plan */}
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, fontSize: 12, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #e2e8f0' }}>
                               <span style={{ fontWeight: 700, color: '#455a64' }}>FG netting (R23):</span>
@@ -570,6 +572,15 @@ export default function PPCRMSourcing() {
                                 </td>
                                 <td style={{ textAlign: 'right', padding: '2px 8px', whiteSpace: 'nowrap' }}>{dec(m.req)} {m.uom}</td>
                               </tr>)}
+                              {/* R21 — CP Req and RM Req linked numerically for this FG */}
+                              <tr style={{ borderTop: '2px solid #cbd5e0' }}>
+                                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#1565c0' }}>RM Req total →</td>
+                                <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#1565c0', whiteSpace: 'nowrap' }}>{fmt(r.rm_demand)} Kg</td>
+                              </tr>
+                              <tr>
+                                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#6a1b9a' }}>CP Req total →</td>
+                                <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#6a1b9a', whiteSpace: 'nowrap' }}>{fmt(r.cp_demand)} Nos</td>
+                              </tr>
                             </tbody></table>
                           </td></tr>,
                         ]
