@@ -616,7 +616,9 @@ def compute_rm(qty_field="to_plan"):
 
     cp_rows = []
     rm_agg = {}       # RM code -> {desc, uom, req(to_plan), demand(total), green}
-    rm_cp_agg = {}    # RM code -> {desc, uom, req}  — RM reached VIA CPs (Rule 21)
+    # RM reached VIA CPs (Rule 21), same three measures so it folds into RM QTY
+    # and Against Demand RM without re-deriving: req(to_plan), demand, green.
+    rm_cp_agg = {}    # RM code -> {desc, uom, req, demand, green}
     cp_agg = {}       # CP/packing code -> {desc, uom, req}
     by_bom = {}       # BOM Code (FG) -> its RM needs (product-centric view)
     matched_parents = set()
@@ -698,22 +700,48 @@ def compute_rm(qty_field="to_plan"):
                 a = {"desc": desc, "uom": uom, "req": 0.0}
                 cp_agg[child] = a
             a["req"] += req
-            # Rule 21 — global roll-up of RM reached via this CP requirement
+            # Rule 21 — global roll-up of RM reached via this CP requirement.
+            # Explode the CP's to-plan / demand / green requirement to RM using
+            # the per-unit recipe (rv["req"] = RM per 1 CP unit).
             for rc, rv in _resolve_cp_to_rm(child).items():
-                add = req * rv["req"]
-                if add <= 0:
+                per = rv["req"]
+                if per <= 0:
                     continue
                 a2 = rm_cp_agg.get(rc)
                 if a2 is None:
-                    a2 = {"desc": rv["desc"], "uom": rv["uom"], "req": 0.0}
+                    a2 = {"desc": rv["desc"], "uom": rv["uom"],
+                          "req": 0.0, "demand": 0.0, "green": 0.0}
                     rm_cp_agg[rc] = a2
-                a2["req"] += add
+                a2["req"] += req * per
+                a2["demand"] += dem * per
+                a2["green"] += green_req * per
 
     # RM Req = the line-level RM explosion (one row per FG → RM), with the same
     # columns as the reference RM Req / CP Req. The aggregated RM total per code
     # lives in RM QTY (reference does the same: RM Req is detail, RM QTY is the
     # SUMIF pivot). Our dump is single-level, so BOM Code is the FG parent.
     rm_req_rows = [r for r in cp_rows if _is_rm(r["Item Code"])]
+
+    # ── Rule 21 — Total RM per code = direct (FG→RM) + via-CP (CP→RM) ─────
+    # Merge on the UNION of RM codes: each code's direct and via-CP figures are
+    # added once (they come from disjoint sources — FG-direct lines vs CP
+    # explosions — so summing is aggregation, not double counting). RM codes
+    # that only exist via CPs get a row of their own. RM Req (detail) stays the
+    # FG-direct line-level explosion; back-tracing of via-CP RM is the By
+    # Product view's "RM reached via CPs" list.
+    rm_total = {}
+    for c in (set(rm_agg) | set(rm_cp_agg)):
+        d = rm_agg.get(c, {})
+        v = rm_cp_agg.get(c, {})
+        rm_total[c] = {
+            "desc": d.get("desc") or v.get("desc", ""),
+            "uom": d.get("uom") or v.get("uom", ""),
+            "req": d.get("req", 0.0) + v.get("req", 0.0),
+            "demand": d.get("demand", 0.0) + v.get("demand", 0.0),
+            "green": d.get("green", 0.0) + v.get("green", 0.0),
+            "via_cp": v.get("req", 0.0),   # transparency: how much came via CPs
+        }
+
     # Preserve the PPC head's manual "Reqd Qty" (reference column E) across
     # recomputes: the automation fills only the computed Qty and the +10% helper,
     # and must never overwrite the manual final quantity (Step 10 of the process).
@@ -727,7 +755,7 @@ def compute_rm(qty_field="to_plan"):
                     "Qty": round(a["req"], 2),
                     "Reqd Qty (in kgs)": prev_reqd.get(c, ""),
                     "Qty +10%": round(a["req"] * 1.1, 2)}
-                   for c, a in sorted(rm_agg.items())]
+                   for c, a in sorted(rm_total.items())]
     # Preserve the two manual inputs on the Quantity Sheet across recomputes:
     #   qty per kg = pieces-per-kg conversion from the CP team (external),
     #   Reqd Qty   = PPC head's manual final.
@@ -762,7 +790,7 @@ def compute_rm(qty_field="to_plan"):
                    "Demand": round(a["demand"], 2), "To Plan": round(a["req"], 2),
                    "Stock": "", "Green Level": round(a["green"], 2),
                    "Procurement": round(a["req"] + a["green"] * 0.6, 2)}
-                  for c, a in sorted(rm_agg.items())]
+                  for c, a in sorted(rm_total.items())]
 
     # Keep chunks small (~2000 rows) so each POST payload stays well under the
     # Apps Script /exec limit — wider tabs (CP Req = 7 cols) 404 at 5000/chunk.
