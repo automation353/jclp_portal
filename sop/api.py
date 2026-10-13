@@ -481,11 +481,16 @@ _CSV_COL_MAP = {
     "excess opening stock value": "excess_opening_value",
     "build required":       "build_required",
     "production counted":   "production_counted",
-    # ₹-value columns — map to separate financial keys
+    # ₹-value columns — map to separate financial keys.
+    # Includes the exact header variants the Django engine writes (short form
+    # with "(₹)") so they are NOT swallowed by the shorter qty-column patterns.
     "production-driven shortfall (₹)":              "production_shortfall_val",
     "dispatch gap (shippable from stock) (₹)":      "dispatch_gap_val",
     "shortfall on additional demand (excluded from ops) (₹)": "shortfall_addl_val",
+    "shortfall on additional demand (₹)":           "shortfall_addl_val",
     "demand reduction adjustment (sales pullback) (₹)":      "demand_reduction_val",
+    "demand reduction adjustment (₹)":              "demand_reduction_val",
+    "excess opening stock value (₹)":               "excess_opening_value",
     "excess dispatch value (₹)":                    "excess_dispatch_val",
     "excess dispatched from op stock":              "excess_dispatch_from_opstock",
     "excess dispatch from surplus production":      "excess_dispatch_from_surplus",
@@ -502,13 +507,19 @@ def _normalise_header(h):
     return h
 
 
+_CSV_COL_MAP_BY_LEN = sorted(_CSV_COL_MAP.items(), key=lambda kv: -len(kv[0]))
+
+
 def _match_col(normalised_header):
-    """Return the internal key for a CSV column header, or None."""
-    # Try exact match first
+    """Return the internal key for a CSV column header, or None.
+
+    Exact match first; then the LONGEST matching substring pattern, so a
+    specific value column ("excess opening stock value") wins over a shorter
+    qty column ("excess opening stock") that is also a substring.
+    """
     if normalised_header in _CSV_COL_MAP:
         return _CSV_COL_MAP[normalised_header]
-    # Try substring match
-    for pat, key in _CSV_COL_MAP.items():
+    for pat, key in _CSV_COL_MAP_BY_LEN:
         if pat in normalised_header:
             return key
     return None
