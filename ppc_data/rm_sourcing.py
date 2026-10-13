@@ -615,6 +615,7 @@ def compute_rm(qty_field="to_plan"):
         return out
 
     cp_rows = []
+    rm_via_cp_rows = []   # RM Req back-trace lines: FG → RM reached via a CP
     rm_agg = {}       # RM code -> {desc, uom, req(to_plan), demand(total), green}
     # RM reached VIA CPs (Rule 21), same three measures so it folds into RM QTY
     # and Against Demand RM without re-deriving: req(to_plan), demand, green.
@@ -686,6 +687,14 @@ def compute_rm(qty_field="to_plan"):
                             rc, {"code": rc, "desc": rv["desc"], "uom": rv["uom"],
                                  "req": 0.0})
                         vm["req"] += add
+                        # RM Req back-trace: FG → RM, tagged with the CP it came
+                        # through, so RM Req foots to RM QTY (direct + via-CP).
+                        rm_via_cp_rows.append({
+                            "BOM Code": parent, "Item Code": rc,
+                            "BOM Qty": "", "Qty in Nos": round(req),
+                            "Qty (Base UOM)": round(add, 3), "UOM": rv["uom"],
+                            "Part Description": "[via CP %s] %s" % (child, rv["desc"]),
+                        })
         if is_rm:
             a = rm_agg.get(child)
             if a is None:
@@ -721,6 +730,9 @@ def compute_rm(qty_field="to_plan"):
     # lives in RM QTY (reference does the same: RM Req is detail, RM QTY is the
     # SUMIF pivot). Our dump is single-level, so BOM Code is the FG parent.
     rm_req_rows = [r for r in cp_rows if _is_rm(r["Item Code"])]
+    # Append the via-CP back-trace lines so RM Req (detail) foots to RM QTY
+    # (direct + via-CP). These are tagged "[via CP <code>]" in the description.
+    rm_req_rows = rm_req_rows + rm_via_cp_rows
 
     # ── Rule 21 — Total RM per code = direct (FG→RM) + via-CP (CP→RM) ─────
     # Merge on the UNION of RM codes: each code's direct and via-CP figures are
