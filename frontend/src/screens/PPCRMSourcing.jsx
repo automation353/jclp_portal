@@ -53,7 +53,7 @@ const RULE_BANDS = [
     band: 'Part E — Inventory levels',
     note: 'Net the requirement against stock & green levels → procurement.',
     rules: [
-      { id: 'R23', title: 'Green hierarchy FG → child → RM', short: 'Multi-level FG→CP→RM roll-up live in By Product (RM direct + via CPs); FG plan netting is upstream in R3SS. RM-tier stock netting pending.', status: 'partial', depends: 'R21, R1', needs: 'RM opening stock, child-part green, safety buffer (Stores/PPC)' },
+      { id: 'R23', title: 'Green hierarchy FG → child → RM', short: 'Multi-level FG→CP→RM roll-up live in By Product (RM direct + via CPs); FG plan netting is upstream (not in RM Sourcing). RM-tier stock netting pending.', status: 'partial', depends: 'R21, R1', needs: 'RM opening stock, child-part green, safety buffer (Stores/PPC)' },
       { id: 'R24', title: 'In-house CP & critical RM at green; vendor CP differs', short: 'No RM green for vendor CP; critical RM (wire/coil) always in-house.', status: 'pending', depends: 'R12 (vendor commitment)', needs: 'In-house vs vendor CP list (Production/Purchase)' },
       { id: 'R25', title: 'Refill green level; customer-specific FG', short: 'Refill is a procurement trigger on the Order-now list.', status: 'pending', depends: 'R23', needs: 'Customer FG ratios, transport batch (Sales/Logistics)' },
       { id: 'R26', title: 'Size levels from sales data / turnover', short: 'Replaces 3-month averages; RM ≈ 60% of cost. LPP optional.', status: 'pending', depends: 'R2', needs: 'Clean sales history, cost structure (Sales/Finance)' },
@@ -61,11 +61,11 @@ const RULE_BANDS = [
     ],
   },
   {
-    band: 'Part A — Demand basis  (input · lives in R3SS / MpsSS)',
-    note: 'Produced upstream; RM Sourcing consumes the plan quantity.',
+    band: 'Part A — Demand basis  (input · the Plan tab)',
+    note: 'The plan qty is RM Sourcing’s own Plan-tab input; how it was decided is an upstream concern.',
     rules: [
-      { id: 'R1', title: 'Plan qty = demand − (opening + green)', short: 'Comes in as R3SS to_plan — column D of the RMCP sheet.', status: 'input', depends: 'R23 (green definition)', needs: 'Live upstream' },
-      { id: 'R2', title: 'Plan on live orders, not 3-month averages', short: 'Demand policy set upstream; module uses to_plan as given.', status: 'input', depends: '—', needs: 'Green granularity + MTS/MTO tag (PPC)' },
+      { id: 'R1', title: 'Plan qty = demand − (opening + green)', short: 'The planned FG qty — read from RM Sourcing’s own Plan tab (Quantity column). The BOM explodes against it.', status: 'input', depends: 'R23 (green definition)', needs: 'Plan-tab quantities' },
+      { id: 'R2', title: 'Plan on live orders, not 3-month averages', short: 'Demand policy is an upstream decision; RM Sourcing uses the Plan-tab qty as given.', status: 'input', depends: '—', needs: 'Green granularity + MTS/MTO tag (PPC)' },
       { id: 'R3', title: 'Plan one month further out', short: 'Horizon set upstream; dashboard can default to month + 2.', status: 'input', depends: '—', needs: 'Live upstream' },
       { id: 'R4', title: 'Advance Nov–Dec & export visibility sheets', short: 'Purchase hand-off sheets; firm Nov released, Dec tentative.', status: 'out', depends: 'R5, R6', needs: 'Confirmed Nov–Dec + export orders (PPC/Sales)' },
     ],
@@ -116,26 +116,12 @@ const ruleCount = (s) => RULE_BANDS.reduce((a, b) => a + b.rules.filter(r => r.s
 // Per-rule dashboards — each reads its own Google Sheet tab (or the live BOM
 // check) and renders the real data behind that rule.
 const RULE_DASH = {
-  R1: { mode: 'r3ss', title: 'R1 — Plan qty = demand − (opening + green)',
-    desc: 'The upstream plan inputs per FG, pulled live from R3SS.',
+  R1: { tab: 'Plan', title: 'R1 — Planned FG quantities (RM Sourcing Plan tab)',
+    desc: 'The plan RM Sourcing explodes against — FG code + planned Quantity, from the module’s own Plan tab (no R3SS).',
     kpi: rows => [
       { label: 'FGs', value: fmt(rows.length), kind: 'info' },
-      { label: 'Total Demand', value: fmt(rows.reduce((a, r) => a + N(r['Total Demand']), 0)), kind: 'info' },
-      { label: 'Total To Plan', value: fmt(rows.reduce((a, r) => a + N(r['To Plan']), 0)), kind: 'score' },
-    ] },
-  R2: { mode: 'r3ss', title: 'R2 — Plan on live orders · MTS / MTO tag',
-    desc: 'Each part tagged MTS or MTO from the R3SS overlay — the classification R2 depends on.',
-    kpi: rows => [
-      { label: 'MTS', value: fmt(rows.filter(r => r['MTO/MTS'] === 'MTS').length), kind: 'score' },
-      { label: 'MTO', value: fmt(rows.filter(r => r['MTO/MTS'] === 'MTO').length), kind: 'warn' },
-      { label: 'NA / untagged', value: fmt(rows.filter(r => !r['MTO/MTS'] || r['MTO/MTS'] === 'NA').length), kind: 'info' },
-    ] },
-  R3: { mode: 'r3ss', title: 'R3 — Plan one month ahead',
-    desc: 'Planning horizon from R3SS: reference = this month, buffer = next, target = month + 2.',
-    kpi: (rows, meta) => [
-      { label: 'Plan month', value: (meta && meta.plan_month) || '—', kind: 'info' },
-      { label: 'FGs planned', value: fmt(rows.filter(r => N(r['To Plan']) > 0).length), kind: 'score' },
-      { label: 'Total To Plan', value: fmt(rows.reduce((a, r) => a + N(r['To Plan']), 0)), kind: 'info' },
+      { label: 'FGs planned', value: fmt(rows.filter(r => N(r['Quantity']) > 0).length), kind: 'score' },
+      { label: 'Total Planned Qty', value: fmt(rows.reduce((a, r) => a + N(r['Quantity']), 0)), kind: 'score' },
     ] },
   R19: { mode: 'dq', title: 'R19 — One part number, one description',
     desc: 'Live check over the uploaded BOM: every item code should map to exactly one description.' },
@@ -182,7 +168,7 @@ const CALC = {
       ['Qty in Nos (plan)', r['Qty in Nos']],
       [`= ${r['BOM Qty']} × ${r['Qty in Nos']} ÷ 1000`, r['Qty (Base UOM)']],
     ],
-    source: 'One CP-Req line, exploded from the BOM against the R3SS plan.',
+    source: 'One CP-Req line, exploded from the BOM against the Plan tab.',
   },
   R21: { codeCol: 'Item Code', usage: true, resultCol: 'Qty',
     formula: 'Qty = SUMIF — Σ (plan × BOM qty ÷ 1000) over every FG that uses this RM',
@@ -198,7 +184,7 @@ const CALC = {
       ['Green Level', r['Green Level']],
       [`= ${r['To Plan']} − ${N(r['Stock'])} + ${r['Green Level']} × 0.6`, r['Procurement']],
     ],
-    source: 'To Plan from RM QTY; Green rolled up from R3SS; Stock pending.',
+    source: 'To Plan from RM QTY (BOM × Plan tab). Green/Stock not in RM Sourcing data → blank, so Procurement = To Plan.',
   },
   R27: { codeCol: 'Item Code', usage: true, resultCol: 'Qty (Base UOM)',
     formula: 'Qty (Base UOM) = SUMIF — Σ requirement over every FG that uses this item',
@@ -331,9 +317,7 @@ function RuleDash({ ruleId, onBack }) {
     let alive = true; setLoading(true)
     const run = cfg.mode === 'dq'
       ? api.rmSourcingDataQuality().then(d => { if (alive) setDq(d) })
-      : cfg.mode === 'r3ss'
-        ? api.rmSourcingR3ss().then(d => { if (!alive) return; setRows(d.rows || []); setMeta({ plan_month: d.plan_month }) })
-        : api.rmSourcingTab(cfg.tab).then(d => {
+      : api.rmSourcingTab(cfg.tab).then(d => {
           if (!alive) return
           let rs = d.rows || []
           if (cfg.filter === 'packing') rs = rs.filter(r => cpType(r['Item Code']) === 'Packing')
@@ -347,7 +331,7 @@ function RuleDash({ ruleId, onBack }) {
   const s = q.toLowerCase()
   const shown = rows.filter(r => !s || cols.some(c => (r[c] || '').toString().toLowerCase().includes(s)))
   const kpis = cfg && cfg.kpi ? cfg.kpi(rows, meta) : [{ label: 'Rows', value: fmt(rows.length), kind: 'info' }]
-  const srcLabel = cfg && cfg.mode === 'r3ss' ? 'live from R3SS' : (cfg ? `live from “${cfg.tab}”` : '')
+  const srcLabel = cfg ? `live from “${cfg.tab}”` : ''
 
   return (
     <div style={{ marginTop: 4 }}>
@@ -356,7 +340,6 @@ function RuleDash({ ruleId, onBack }) {
       <p className="sub" style={{ fontSize: 13, margin: '0 0 12px' }}>
         {cfg ? cfg.desc : (spec ? spec.rule : '')}
         {cfg && !cfg.mode && <> · <span style={{ color: 'var(--muted)' }}>live from Google Sheet tab “{cfg.tab}”</span></>}
-        {cfg && cfg.mode === 'r3ss' && <> · <span style={{ color: 'var(--muted)' }}>live from R3SS</span></>}
         {sheetUrl && <> · <a href={sheetUrl} target="_blank" rel="noopener noreferrer">open sheet</a></>}
       </p>
       {cfg && (loading ? <div>Loading…</div> : cfg.mode === 'dq' ? <DqView dq={dq} /> : (<>
@@ -494,7 +477,7 @@ export default function PPCRMSourcing() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
             <h2 className="title" style={{ marginBottom: 2 }}>RM Sourcing</h2>
-            <p className="sub" style={{ margin: 0 }}>Material requirement — BOM exploded against the R3SS plan.</p>
+            <p className="sub" style={{ margin: 0 }}>Material requirement — BOM exploded against the Plan tab.</p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input ref={fileRef} type="file" accept=".xlsx,.xlsm,.xls" style={{ display: 'none' }} onChange={onFile} />
@@ -550,10 +533,10 @@ export default function PPCRMSourcing() {
                             <td className="num">{nRm + nCp} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({nRm} RM / {nCp} CP)</span></td>
                           </tr>,
                           o && <tr key={r.bom_code + '_x'}><td></td><td colSpan={7} style={{ background: '#f7fafc', padding: '6px 10px' }}>
-                            {/* Planned FG Qty is a read-only INPUT from R3SS (its calculation
-                                — demand/safety/FG/WIP/EBQ — lives in the R3SS dashboard, not here). */}
+                            {/* Planned FG Qty is a read-only INPUT from RM Sourcing's own Plan tab
+                                (how the plan was decided is an upstream concern, not here). */}
                             <div style={{ fontSize: 12, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #e2e8f0', color: '#455a64' }}>
-                              <b>Planned FG Qty (from R3SS): {fmt(r.planned)}</b>
+                              <b>Planned FG Qty (from Plan tab): {fmt(r.planned)}</b>
                               <span style={{ color: 'var(--muted)' }}> — input to this dashboard; BOM explodes against it below.</span>
                             </div>
                             <table style={{ width: '100%', fontSize: 13 }}><tbody>
@@ -674,7 +657,7 @@ export default function PPCRMSourcing() {
                 <Tile label="Live" value={ruleCount('live')} kind="score" sub="working in the module" />
                 <Tile label="Partial" value={ruleCount('partial')} kind="warn" sub="started, gaps remain" />
                 <Tile label="Pending" value={ruleCount('pending')} kind="info" sub="awaiting data / build" />
-                <Tile label="Input (upstream)" value={ruleCount('input')} kind="info" sub="from R3SS / MpsSS" />
+                <Tile label="Input (upstream)" value={ruleCount('input')} kind="info" sub="the Plan tab" />
                 <Tile label="Other module" value={ruleCount('out')} kind="blocked" sub="PPC / Purchase" />
               </div>
               <p className="sub" style={{ fontSize: 13, marginTop: 10 }}>

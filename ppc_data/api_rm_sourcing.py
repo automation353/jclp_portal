@@ -66,33 +66,6 @@ _RMCP_TABS = {"BOM", "Plan", "CP Req", "RM Req", "RM QTY",
 
 
 @api_view(["GET"])
-def r3ss_input(request):
-    """Rules R1/R2/R3 — the upstream plan inputs, pulled live from R3SS.
-    Plan qty, demand, opening stock, green, FG stock and the MTS/MTO tag per FG.
-    """
-    from .r3ss_sheet_reader import read_r3ss_rows
-    from .rm_sourcing import _num
-    rows, pm = [], ""
-    for r in read_r3ss_rows().get("rows", []):
-        d = r.get("data", {})
-        if not (d.get("jolly_code") or "").strip():
-            continue
-        pm = pm or d.get("_plan_month", "")
-        rows.append({
-            "Jolly Code": d.get("jolly_code", ""),
-            "ERP Code": d.get("item_code", ""),
-            "Family": d.get("family", ""),
-            "MTO/MTS": d.get("mto_mts", ""),
-            "Total Demand": round(_num(d.get("total_demand"))),
-            "Opening": round(_num(d.get("opening_balance"))),
-            "FG Stock": round(_num(d.get("fg_stock"))),
-            "Green": round(_num(d.get("green_level"))),
-            "To Plan": round(_num(d.get("to_plan"))),
-        })
-    return Response({"ok": True, "row_count": len(rows), "rows": rows, "plan_month": pm})
-
-
-@api_view(["GET"])
 def sheet_tab(request):
     """Read one RMCP Google Sheet tab live (gviz) for a per-rule dashboard."""
     import os

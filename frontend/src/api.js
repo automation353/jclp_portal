@@ -160,7 +160,6 @@ export const api = {
   rmSourcingCpReq: () => request('/ppc-data/rm-sourcing/cp-req/'),
   rmSourcingDataQuality: () => request('/ppc-data/rm-sourcing/data-quality/'),
   rmSourcingTab: (tab) => request('/ppc-data/rm-sourcing/sheet-tab/?tab=' + encodeURIComponent(tab)),
-  rmSourcingR3ss: () => request('/ppc-data/rm-sourcing/r3ss-input/'),
   ppcDataTable: (tableKey, limit = 200, search = '') =>
     request(`/ppc-data/table/${tableKey}/?limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}`),
   ppcDataFeedStatus: () => request('/ppc-data/feed-status/'),
