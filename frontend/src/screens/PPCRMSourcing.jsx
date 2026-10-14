@@ -539,7 +539,12 @@ export default function PPCRMSourcing() {
                                 (how the plan was decided is an upstream concern, not here). */}
                             <div style={{ fontSize: 12, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #e2e8f0', color: '#455a64' }}>
                               <b>Planned FG Qty (from Plan tab): {fmt(r.planned)}</b>
-                              <span style={{ color: 'var(--muted)' }}> — input to this dashboard; BOM explodes against it below.</span>
+                              <div style={{ color: 'var(--muted)', marginTop: 2 }}>
+                                Logic: this is an <b>input</b>, not a calculation — read straight from the Plan tab (the “Quantity” for <span style={{ fontFamily: 'monospace' }}>{r.bom_code}</span>). The plan’s own make-qty logic is upstream, not in RM Sourcing.
+                              </div>
+                              <div style={{ color: 'var(--muted)', marginTop: 2 }}>
+                                Each RM/CP below = <b>Planned × BOM qty ÷ 1000</b> = <b>{fmt(r.planned)}</b> × (part BOM qty) ÷ 1000.
+                              </div>
                             </div>
                             <table style={{ width: '100%', fontSize: 13 }}><tbody>
                               {parts.map((m, j) => <tr key={j}>
