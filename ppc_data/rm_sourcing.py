@@ -490,64 +490,27 @@ def read_rm_quantity(timeout=40):
 
 
 def _read_plan(qty_field="to_plan"):
-    """Build the Plan (reference layout) → (plan dict BOM-Code→qty, plan_rows).
+    """Build the plan from RM Sourcing's OWN Plan tab — no R3SS.
 
-    Per the reference formulas: the Plan lists the MpsSS Schedule Form items;
-    BOM Code comes from Schedule Form 'FG' (the Master tab), and the Quantity is
-    the R3SS plan qty joined by jolly code. The BOM explodes against BOM Code.
+    The Plan tab (RMCP sheet) is RM Sourcing's plan input: one row per FG with
+    a Quantity (the planned FG qty). The BOM explodes against BOM Code × Quantity.
+    This module is self-contained: it reads only its own Plan tab + cached BOM.
+
+    Demand / green / fg_info are R3SS-only enrichments and are NOT available in
+    RM Sourcing data, so they come back empty.  Against Demand RM then shows the
+    straight procurement requirement (= To Plan RM); Demand/Green stay blank.
     """
-    from .r3ss_sheet_reader import read_r3ss_rows
-    # R3SS by jolly → display columns + plan qty (the reference's [1]All columns).
-    r3 = {}
-    for r in read_r3ss_rows()["rows"]:
-        d = r["data"]
-        j = (d.get("jolly_code") or "").strip().upper()
-        if not j:
+    plan_rows = _read_tab(PLAN_TAB)          # RM Sourcing's own Plan tab
+    plan = {}                                # BOM Code (FG) → planned qty
+    for r in plan_rows:
+        key = str(r.get("BOM Code", "")).strip().upper()
+        if not key:
             continue
-        e = r3.setdefault(j, {"family": d.get("family", ""),
-                              "customer": d.get("category", ""),
-                              "cust_part_no": d.get("description", ""),
-                              "jolly_size": d.get("jolly_size", ""),
-                              "erp": d.get("item_code", ""),
-                              "qty": 0.0, "green": 0.0, "demand": 0.0,
-                              "opening": 0.0, "fg_stock": 0.0})
-        e["qty"] += _num(d.get(qty_field))          # to_plan (net production plan)
-        e["green"] += _num(d.get("green_level"))
-        e["demand"] += _num(d.get("total_demand"))  # gross sales demand
-        e["opening"] += _num(d.get("opening_balance"))  # FG opening stock (R23)
-        e["fg_stock"] += _num(d.get("fg_stock"))        # FG stock on hand (R23)
-
-    plan = {}           # BOM Code (FG) → to_plan  (drives CP Req / RM QTY)
-    demand = {}         # BOM Code (FG) → total_demand (the Against-Demand "Demand")
-    green = {}          # BOM Code (FG) → FG green level (rolled up to RM)
-    fg_info = {}        # BOM Code (FG) → FG-level netting fields (R23 view)
-    plan_rows = []
-    sr = 0
-    for m in _read_master_schedule():
-        fg = m["FG"]
-        key = fg.strip().upper()
-        j = m["Jolly Code"].strip().upper()
-        d = r3.get(j, {})
-        q = _num(d.get("qty"))
-        sr += 1
-        plan_rows.append({
-            "Sr No.": sr,
-            "Family": d.get("family", m["Family"]),
-            "Customer": d.get("customer", m["Customer"]),
-            "Cust Part No": d.get("cust_part_no", m["Cust Part No"]),
-            "JollySize": d.get("jolly_size", m["JollySize"]),
-            "ERP Code": d.get("erp", m["ERP Code"]),
-            "BOM Code": fg, "Quantity": round(q),
-        })
-        plan[key] = plan.get(key, 0.0) + q
-        demand[key] = demand.get(key, 0.0) + _num(d.get("demand"))
-        green[key] = green.get(key, 0.0) + _num(d.get("green"))
-        fi = fg_info.setdefault(key, {"opening": 0.0, "green": 0.0, "fg_stock": 0.0, "demand": 0.0, "to_plan": 0.0})
-        fi["opening"] += _num(d.get("opening"))
-        fi["green"] += _num(d.get("green"))
-        fi["fg_stock"] += _num(d.get("fg_stock"))
-        fi["demand"] += _num(d.get("demand"))
-        fi["to_plan"] += q
+        plan[key] = plan.get(key, 0.0) + _num(r.get("Quantity"))
+    # Not available without R3SS — kept empty so downstream degrades gracefully.
+    demand = {}
+    green = {}
+    fg_info = {}
     return plan, demand, green, plan_rows, fg_info
 
 
@@ -810,7 +773,7 @@ def compute_rm(qty_field="to_plan"):
     # to it triggers the live pivot SUMIFs to recalc, so lighter POSTs keep each
     # Apps Script call well under its timeout and avoid the non-JSON/504 retries.
     writes = {
-        PLAN_TAB: _write_tab_resumable(PLAN_TAB, PLAN_HEADERS, plan_rows, chunk=2000),
+        # Plan tab is RM Sourcing's INPUT now (read, not written) — leave it alone.
         CP_REQ_TAB: _write_tab_resumable(CP_REQ_TAB, CP_REQ_HEADERS, cp_rows, chunk=1000),
         RM_REQ_TAB: _write_tab_resumable(RM_REQ_TAB, RM_REQ_HEADERS, rm_req_rows, chunk=2000),
         RM_QTY_TAB: _write_tab_resumable(RM_QTY_TAB, RM_QTY_HEADERS, rm_qty_rows, chunk=2000),
