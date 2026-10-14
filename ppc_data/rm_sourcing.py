@@ -629,7 +629,7 @@ def compute_rm(qty_field="to_plan"):
                       "rm_demand": 0.0, "cp_demand": 0.0,
                       "rm_via_cp": 0.0,          # RM reached via this FG's CPs
                       "rm_count": 0, "cp_count": 0, "parts": [],
-                      "_rm_via_cp_map": {}}
+                      "_rm_via_cp_map": {}, "_cp_rm": {}}
                 by_bom[pkey] = bb
             if req > 0:
                 bb["parts"].append({"code": child, "desc": desc, "uom": uom,
@@ -641,6 +641,12 @@ def compute_rm(qty_field="to_plan"):
                 else:
                     bb["cp_demand"] += req
                     bb["cp_count"] += 1
+                    # CP → its RMs (for the click-dropdowns): one entry per CP,
+                    # with the RM it consumes exploded to RM.
+                    cpm = bb["_cp_rm"].setdefault(
+                        child, {"cp": child, "desc": desc, "uom": uom,
+                                "req": 0.0, "rms": {}})
+                    cpm["req"] += req
                     # Rule 21 — RM this CP consumes (exploded to RM, recursive)
                     for rc, rv in _resolve_cp_to_rm(child).items():
                         add = req * rv["req"]
@@ -651,6 +657,10 @@ def compute_rm(qty_field="to_plan"):
                             rc, {"code": rc, "desc": rv["desc"], "uom": rv["uom"],
                                  "req": 0.0})
                         vm["req"] += add
+                        rmm = cpm["rms"].setdefault(
+                            rc, {"code": rc, "desc": rv["desc"], "uom": rv["uom"],
+                                 "req": 0.0})
+                        rmm["req"] += add
                         # RM Req back-trace: FG → RM, tagged with the CP it came
                         # through, so RM Req foots to RM QTY (direct + via-CP).
                         rm_via_cp_rows.append({
@@ -788,10 +798,28 @@ def compute_rm(qty_field="to_plan"):
         #   rm_demand  = RM used directly in the FG
         #   rm_via_cp  = RM used to make this FG's CPs (exploded to RM)
         #   rm_total   = total RM to procure for this FG
+        cp_rm = b.pop("_cp_rm", {})
+        # CP → its RMs (click-dropdown under "CP Req"): only CPs that use RM.
+        b["cp_rm_parts"] = sorted(
+            [{"cp": v["cp"], "desc": v["desc"], "uom": v["uom"],
+              "req": round(v["req"], 2),
+              "rms": sorted([{"code": r["code"], "desc": r["desc"],
+                              "uom": r["uom"], "req": round(r["req"], 2)}
+                             for r in v["rms"].values()], key=lambda x: -x["req"])}
+             for v in cp_rm.values() if v["rms"]],
+            key=lambda x: -x["req"])
+        # invert: RM → source CP(s) (click-dropdown under "RM via its CPs").
+        rm_src = {}
+        for v in cp_rm.values():
+            for r in v["rms"].values():
+                rm_src.setdefault(r["code"], []).append(
+                    {"cp": v["cp"], "uom": r["uom"], "req": round(r["req"], 2)})
         via_map = b.pop("_rm_via_cp_map", {})
         b["rm_via_cp_parts"] = sorted(
             [{"code": v["code"], "desc": v["desc"], "uom": v["uom"],
-              "req": round(v["req"], 2)} for v in via_map.values()],
+              "req": round(v["req"], 2),
+              "vias": sorted(rm_src.get(v["code"], []), key=lambda x: -x["req"])}
+             for v in via_map.values()],
             key=lambda x: -x["req"])
         b["rm_demand"] = round(b["rm_demand"], 2)
         b["cp_demand"] = round(b["cp_demand"], 2)

@@ -383,6 +383,8 @@ export default function PPCRMSourcing() {
   const [msg, setMsg] = useState(null)
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(() => new Set())
+  const [calcOpen, setCalcOpen] = useState(() => new Set())
+  const toggleCalc = (k) => setCalcOpen(p => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n })
   const [drill, setDrill] = useState(null)
   const [dq, setDq] = useState(null)          // R19 data-quality check
   const [cpFilter, setCpFilter] = useState('all')   // R27 All / Components / Packing
@@ -560,26 +562,41 @@ export default function PPCRMSourcing() {
                                 <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', color: '#1565c0' }}>RM used directly in FG →</td>
                                 <td style={{ textAlign: 'right', padding: '4px 8px', color: '#1565c0', whiteSpace: 'nowrap' }}>{fmt(r.rm_demand)} Kg</td>
                               </tr>
-                              <tr>
-                                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', color: '#8e24aa' }}>RM via its CPs (R21) →</td>
-                                <td style={{ textAlign: 'right', padding: '4px 8px', color: '#8e24aa', whiteSpace: 'nowrap' }}>
-                                  {fmt(r.rm_via_cp || 0)} Kg
-                                  {(r.rm_via_cp_parts && r.rm_via_cp_parts.length > 0) &&
-                                    <span style={{ color: 'var(--muted)', fontSize: 11 }}> &nbsp;({r.rm_via_cp_parts.length} RM codes)</span>}
-                                </td>
-                              </tr>
+                              {/* RM via CPs — click to see which CP each RM came from */}
+                              {(() => { const vK = r.bom_code + '|viacp', vo = calcOpen.has(vK), hasVia = r.rm_via_cp_parts && r.rm_via_cp_parts.length > 0; return [
+                                <tr key="viacp" onClick={hasVia ? () => toggleCalc(vK) : undefined} style={{ cursor: hasVia ? 'pointer' : 'default' }}>
+                                  <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', color: '#8e24aa' }}>{hasVia && <span style={{ marginRight: 4 }}>{vo ? '▾' : '▸'}</span>}RM via its CPs (R21) →</td>
+                                  <td style={{ textAlign: 'right', padding: '4px 8px', color: '#8e24aa', whiteSpace: 'nowrap' }}>
+                                    {fmt(r.rm_via_cp || 0)} Kg
+                                    {hasVia && <span style={{ color: 'var(--muted)', fontSize: 11 }}> &nbsp;({r.rm_via_cp_parts.length} RM {vo ? '— click to hide' : 'codes'})</span>}
+                                  </td>
+                                </tr>,
+                                vo && r.rm_via_cp_parts.map((p, k) => <tr key={'v' + k} style={{ background: '#faf5fc' }}>
+                                  <td colSpan={4} style={{ padding: '2px 8px 2px 28px', fontSize: 12 }}>
+                                    <span style={{ fontFamily: 'monospace', color: '#8e24aa' }}>{p.code}</span> <b>{dec(p.req)} {p.uom}</b>
+                                    <span style={{ color: 'var(--muted)' }}> ← from CP {(p.vias || []).map(v => `${v.cp} (${dec(v.req)} ${v.uom})`).join(', ')}</span>
+                                  </td>
+                                </tr>),
+                              ] })()}
                               <tr style={{ borderTop: '1px solid #cbd5e0' }}>
                                 <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#0a5fa5' }}>RM TOTAL to procure →</td>
                                 <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#0a5fa5', whiteSpace: 'nowrap' }}>{fmt(r.rm_total ?? r.rm_demand)} Kg</td>
                               </tr>
-                              <tr>
-                                <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#6a1b9a' }}>CP Req total →</td>
-                                <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#6a1b9a', whiteSpace: 'nowrap' }}>{fmt(r.cp_demand)} Nos</td>
-                              </tr>
-                              {(r.rm_via_cp_parts && r.rm_via_cp_parts.length > 0) &&
-                                <tr><td colSpan={4} style={{ padding: '4px 8px 8px', fontSize: 11, color: '#8e24aa', background: '#faf5fc' }}>
-                                  <b>RM reached via CPs:</b> {r.rm_via_cp_parts.map(p => `${p.code} (${dec(p.req)} ${p.uom})`).join(' · ')}
-                                </td></tr>}
+                              {/* CP Req — click to see which RM each CP consumes */}
+                              {(() => { const cK = r.bom_code + '|cp', co = calcOpen.has(cK), hasCp = r.cp_rm_parts && r.cp_rm_parts.length > 0; return [
+                                <tr key="cpreq" onClick={hasCp ? () => toggleCalc(cK) : undefined} style={{ cursor: hasCp ? 'pointer' : 'default' }}>
+                                  <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#6a1b9a' }}>{hasCp && <span style={{ marginRight: 4 }}>{co ? '▾' : '▸'}</span>}CP Req total →</td>
+                                  <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#6a1b9a', whiteSpace: 'nowrap' }}>
+                                    {fmt(r.cp_demand)} Nos
+                                    {hasCp && <span style={{ color: 'var(--muted)', fontSize: 11, fontWeight: 400 }}> &nbsp;({r.cp_rm_parts.length} CP {co ? '— click to hide' : 'use RM'})</span>}
+                                  </td>
+                                </tr>,
+                                co && r.cp_rm_parts.map((c, k) => <tr key={'c' + k} style={{ background: '#f6f0fa' }}>
+                                  <td colSpan={4} style={{ padding: '2px 8px 2px 28px', fontSize: 12 }}>
+                                    <span style={{ fontFamily: 'monospace', color: '#6a1b9a' }}>{c.cp}</span> <span style={{ color: 'var(--muted)' }}>({dec(c.req)} {c.uom}) →</span> {c.rms.map(rr => `${rr.code} ${dec(rr.req)} ${rr.uom}`).join(' · ')}
+                                  </td>
+                                </tr>),
+                              ] })()}
                             </tbody></table>
                           </td></tr>,
                         ]
