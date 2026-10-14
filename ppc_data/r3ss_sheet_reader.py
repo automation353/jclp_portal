@@ -170,9 +170,12 @@ def read_r3ss_rows(tab_name="R3SS", timeout=30):
     if not sid:
         raise RuntimeError("JCLP_PPC_R3SS_SHEET_ID not configured")
 
+    # Use the /export CSV endpoint, NOT gviz: gviz returns a broken/truncated
+    # response for this tab (a handful of rows, no header), while /export
+    # returns the full sheet reliably.
     url = (
-        f"https://docs.google.com/spreadsheets/d/{sid}/gviz/tq"
-        f"?tqx=out:csv&sheet={requests.utils.quote(tab_name)}"
+        f"https://docs.google.com/spreadsheets/d/{sid}/export"
+        f"?format=csv&sheet={requests.utils.quote(tab_name)}"
     )
     resp = requests.get(url, timeout=timeout)
     resp.raise_for_status()
@@ -182,7 +185,14 @@ def read_r3ss_rows(tab_name="R3SS", timeout=30):
     if not all_rows:
         return {"rows": [], "row_count": 0, "plan_month": None}
 
-    headers = all_rows[0]
+    # Find the real header row: the tab has blank + banner rows above it, so
+    # pick the row with the most known header labels (scan the top of the tab).
+    hdr_idx, best = 0, 0
+    for i, r in enumerate(all_rows[:12]):
+        n = sum(1 for c in r if _norm(c) in _EXACT_MAP)
+        if n > best:
+            best, hdr_idx = n, i
+    headers = all_rows[hdr_idx]
 
     # Classify each column: a dashboard field, a day column, or ignored.
     col_field = {}   # col_idx -> field key
@@ -212,7 +222,7 @@ def read_r3ss_rows(tab_name="R3SS", timeout=30):
 
     out_rows = []
     sr = 0
-    for r in all_rows[1:]:
+    for r in all_rows[hdr_idx + 1:]:
         item_code = ""
         for idx, key in col_field.items():
             if key == "item_code" and idx < len(r):
