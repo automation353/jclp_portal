@@ -633,7 +633,8 @@ def compute_rm(qty_field="to_plan"):
                 by_bom[pkey] = bb
             if req > 0:
                 bb["parts"].append({"code": child, "desc": desc, "uom": uom,
-                                    "req": round(req, 2), "rm": is_rm})
+                                    "req": round(req, 2), "rm": is_rm,
+                                    "bq": qty})   # BOM qty per 1000 (for the calc)
                 if is_rm:
                     bb["rm_demand"] += req
                     bb["rm_count"] += 1

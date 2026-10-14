@@ -550,7 +550,10 @@ export default function PPCRMSourcing() {
                                     {m.rm ? 'RM' : cpType(m.code)}
                                   </span>
                                 </td>
-                                <td style={{ textAlign: 'right', padding: '2px 8px', whiteSpace: 'nowrap' }}>{dec(m.req)} {m.uom}</td>
+                                <td style={{ textAlign: 'right', padding: '2px 8px', whiteSpace: 'nowrap' }}>
+                                  {dec(m.req)} {m.uom}
+                                  {m.bq != null && <span style={{ color: 'var(--muted)', fontSize: 11 }}> &nbsp;({fmt(r.planned)} × {dec(m.bq)} ÷ 1000)</span>}
+                                </td>
                               </tr>)}
                               {/* R21 — multi-level roll-up: RM direct + RM via CP = RM total */}
                               <tr style={{ borderTop: '2px solid #cbd5e0' }}>
