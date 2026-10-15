@@ -458,7 +458,7 @@ export default function PPCRMSourcing() {
 
   const s = search.toLowerCase()
   const fgF = fgs.filter(r => !s || [r.bom_code, r.family, r.customer, r.erp_code].some(x => (x || '').toLowerCase().includes(s)))
-    .sort((a, b) => N(b.rm_demand) - N(a.rm_demand))
+    .sort((a, b) => N(b.rm_total ?? b.rm_demand) - N(a.rm_total ?? a.rm_demand))
   const rmF = rmView.filter(r => !s || r.code.toLowerCase().includes(s) || (r.desc || '').toLowerCase().includes(s))
     .sort((a, b) => b.qty - a.qty)
   const cpF = cpView
@@ -516,7 +516,7 @@ export default function PPCRMSourcing() {
             {/* ---------- BY PRODUCT (BOM) ---------- */}
             {view === 'bom' && (<>
               <div className="dash-tile-grid">
-                <Tile label="Total RM Demand" value={fmt(fgs.reduce((a, r) => a + N(r.rm_demand), 0))} unit="Kg" kind="info" />
+                <Tile label="Total RM (incl. CP)" value={fmt(fgs.reduce((a, r) => a + N(r.rm_total ?? r.rm_demand), 0))} unit="Kg" kind="info" />
                 <Tile label="Total CP Demand" value={fmt(fgs.reduce((a, r) => a + N(r.cp_demand), 0))} unit="Nos" kind="score" />
                 <Tile label="Products (FGs)" value={fgs.length} kind="score" />
                 <Tile label="RM Items" value={rmq.length} kind="info" />
@@ -525,7 +525,7 @@ export default function PPCRMSourcing() {
               <Filters s={search} set={setSearch} ph="Search BOM code / family / customer" note={`${fgF.length} products`} />
               <div style={{ overflowX: 'auto', marginTop: 10 }}>
                 <table className="mto-table" style={{ minWidth: 800 }}>
-                  <thead><tr><th></th><th>BOM Code</th><th>Family</th><th>Customer</th><th className="num">Planned FG Qty</th><th className="num">RM Demand (Kg)</th><th className="num">CP Demand (Nos)</th><th className="num">BOM Parts</th></tr></thead>
+                  <thead><tr><th></th><th>BOM Code</th><th>Family</th><th>Customer</th><th className="num">Planned FG Qty</th><th className="num">RM Total (Kg)</th><th className="num">CP Demand (Nos)</th><th className="num">BOM Parts</th></tr></thead>
                   <tbody>
                     {fgF.length === 0 ? <tr><td colSpan={8}>No data — upload the BOM, then Recompute.</td></tr> :
                       fgF.map(r => {
@@ -539,7 +539,7 @@ export default function PPCRMSourcing() {
                             <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.bom_code}</td>
                             <td>{r.family}</td><td>{r.customer}</td>
                             <td className="num">{fmt(r.planned)}</td>
-                            <td className="num" style={{ fontWeight: 700, color: '#1565c0' }}>{fmt(r.rm_demand)}</td>
+                            <td className="num" style={{ fontWeight: 700, color: '#1565c0' }}>{fmt(r.rm_total ?? r.rm_demand)}</td>
                             <td className="num" style={{ fontWeight: 700, color: '#6a1b9a' }}>{fmt(r.cp_demand)}</td>
                             <td className="num">{nRm + nCp} <span style={{ color: 'var(--muted)', fontSize: 11 }}>({nRm} RM / {nCp} CP)</span></td>
                           </tr>,
