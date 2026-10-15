@@ -585,10 +585,14 @@ def compute_rm(qty_field="to_plan"):
             _ln.get("UOM", ""), _ln.get("Part Description", ""),
         ))
 
-    _cp_rm_unit = {}   # CP code (upper) -> {rm_code: {"req": rm_per_1_cp, "desc", "uom"}}
+    _cp_rm_unit = {}   # CP code (upper) -> {rm_code: {"per1000", "desc", "uom"}}
 
     def _resolve_cp_to_rm(code, _stack=None, _depth=0):
-        """RM consumed per ONE unit of `code`, exploding nested CPs to RM."""
+        """RM a CP consumes, as the RM's BOM-Qty (per 1000) straight from the
+        CP's own recipe. The BOM dump is fully exploded to the FG basis, so a
+        CP's RM row is already "per 1000 FG" — the RM qty = Planned × per1000 /
+        1000, same as a direct RM (do NOT re-multiply by the CP quantity).
+        Nested CPs add their per-1000 down the tree."""
         key = str(code).strip().upper()
         if key in _cp_rm_unit:
             return _cp_rm_unit[key]
@@ -603,14 +607,13 @@ def compute_rm(qty_field="to_plan"):
         if kids:
             stack = _stack | {key}
             for _child, _q1000, _uom, _desc in kids:
-                per = _q1000 / 1000.0        # per 1 unit of this part
                 if _is_rm(_child, _desc):
-                    e = out.setdefault(_child, {"req": 0.0, "desc": _desc, "uom": _uom})
-                    e["req"] += per
-                else:                        # nested CP → recurse
+                    e = out.setdefault(_child, {"per1000": 0.0, "desc": _desc, "uom": _uom})
+                    e["per1000"] += _q1000
+                else:                        # nested CP → add its RM per-1000
                     for rc, rv in _resolve_cp_to_rm(_child, stack, _depth + 1).items():
-                        e = out.setdefault(rc, {"req": 0.0, "desc": rv["desc"], "uom": rv["uom"]})
-                        e["req"] += per * rv["req"]
+                        e = out.setdefault(rc, {"per1000": 0.0, "desc": rv["desc"], "uom": rv["uom"]})
+                        e["per1000"] += rv["per1000"]
         _cp_rm_unit[key] = out
         return out
 
@@ -684,9 +687,11 @@ def compute_rm(qty_field="to_plan"):
                         child, {"cp": child, "desc": desc, "uom": uom,
                                 "req": 0.0, "rms": {}})
                     cpm["req"] += req
-                    # Rule 21 — RM this CP consumes (exploded to RM, recursive)
+                    # Rule 21 — RM this CP consumes: the RM's qty from the CP's
+                    # own recipe, exploded against the plan (Planned × per1000 /
+                    # 1000), same as a direct RM — NOT re-scaled by the CP qty.
                     for rc, rv in _resolve_cp_to_rm(child).items():
-                        add = req * rv["req"]
+                        add = planq * rv["per1000"] / 1000.0
                         if add <= 0:
                             continue
                         bb["rm_via_cp"] += add
@@ -702,7 +707,7 @@ def compute_rm(qty_field="to_plan"):
                         # through, so RM Req foots to RM QTY (direct + via-CP).
                         rm_via_cp_rows.append({
                             "BOM Code": parent, "Item Code": rc,
-                            "BOM Qty": "", "Qty in Nos": round(req),
+                            "BOM Qty": rv["per1000"], "Qty in Nos": round(planq),
                             "Qty (Base UOM)": round(add, 3), "UOM": rv["uom"],
                             "Part Description": "[via CP %s] %s" % (child, rv["desc"]),
                         })
@@ -720,21 +725,21 @@ def compute_rm(qty_field="to_plan"):
                 a = {"desc": desc, "uom": uom, "req": 0.0}
                 cp_agg[child] = a
             a["req"] += req
-            # Rule 21 — global roll-up of RM reached via this CP requirement.
-            # Explode the CP's to-plan / demand / green requirement to RM using
-            # the per-unit recipe (rv["req"] = RM per 1 CP unit).
+            # Rule 21 — global roll-up: RM to make this CP = Planned × the RM's
+            # per-1000 from the CP's recipe / 1000 (the recipe is already on the
+            # FG basis), exploded the same way for to-plan / demand / green.
             for rc, rv in _resolve_cp_to_rm(child).items():
-                per = rv["req"]
-                if per <= 0:
+                p1000 = rv["per1000"]
+                if p1000 <= 0:
                     continue
                 a2 = rm_cp_agg.get(rc)
                 if a2 is None:
                     a2 = {"desc": rv["desc"], "uom": rv["uom"],
                           "req": 0.0, "demand": 0.0, "green": 0.0}
                     rm_cp_agg[rc] = a2
-                a2["req"] += req * per
-                a2["demand"] += dem * per
-                a2["green"] += green_req * per
+                a2["req"] += planq * p1000 / 1000.0
+                a2["demand"] += demandq * p1000 / 1000.0
+                a2["green"] += greenq * p1000 / 1000.0
 
     # RM Req = the line-level RM explosion (one row per FG → RM), with the same
     # columns as the reference RM Req / CP Req. The aggregated RM total per code
