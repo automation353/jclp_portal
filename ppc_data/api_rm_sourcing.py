@@ -25,9 +25,12 @@ def rm_recompute(request):
 
 @api_view(["GET"])
 def rm_quantity(request):
-    """Return the RM Quantity output (how much RM is needed)."""
-    from .rm_sourcing import read_rm_quantity
-    rows = read_rm_quantity()
+    """RM Quantity output — the COMPLETE total (direct RM + CP→RM roll-up),
+    served from Django's local compute (not the sheet's direct-only pivot)."""
+    from .rm_sourcing import _cached_tab, read_rm_quantity
+    rows = _cached_tab("RM QTY")
+    if rows is None:
+        rows = read_rm_quantity()
     return Response({"row_count": len(rows), "rows": rows})
 
 
@@ -44,10 +47,12 @@ def rm_by_bom(request):
 
 @api_view(["GET"])
 def cp_req(request):
-    """CP + packing requirement (Quantity Sheet tab)."""
+    """CP + packing requirement (Quantity Sheet) — from Django's local compute."""
     import os
-    from .rm_sourcing import read_quantity_sheet
-    rows = read_quantity_sheet()
+    from .rm_sourcing import _cached_tab, read_quantity_sheet
+    rows = _cached_tab("Quantity Sheet")
+    if rows is None:
+        rows = read_quantity_sheet()
     sid = os.environ.get("JCLP_RMCP_SHEET_ID", "").strip()
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sid}/edit" if sid else ""
     return Response({"row_count": len(rows), "rows": rows, "sheet_url": sheet_url})
@@ -67,13 +72,17 @@ _RMCP_TABS = {"BOM", "Plan", "CP Req", "RM Req", "RM QTY",
 
 @api_view(["GET"])
 def sheet_tab(request):
-    """Read one RMCP Google Sheet tab live (gviz) for a per-rule dashboard."""
+    """Serve one RMCP tab for a per-rule dashboard. Computed tabs come from
+    Django's local compute (COMPLETE, with the roll-up); BOM falls back to the
+    Google Sheet."""
     import os
-    from .rm_sourcing import _read_tab
+    from .rm_sourcing import _read_tab, _cached_tab
     tab = (request.GET.get("tab") or "").strip()
     if tab not in _RMCP_TABS:
         return Response({"ok": False, "error": f"unknown tab: {tab}"})
-    rows = _read_tab(tab)
+    rows = _cached_tab(tab)
+    if rows is None:
+        rows = _read_tab(tab)
     sid = os.environ.get("JCLP_RMCP_SHEET_ID", "").strip()
     url = f"https://docs.google.com/spreadsheets/d/{sid}/edit" if sid else ""
     return Response({"ok": True, "tab": tab, "row_count": len(rows),

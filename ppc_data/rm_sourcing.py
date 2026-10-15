@@ -486,6 +486,21 @@ def read_quantity_sheet():
     return _read_tab(QTY_SHEET_TAB)
 
 
+def _cached_tab(name):
+    """Django's locally-cached computed rows for an RMCP tab (the COMPLETE
+    numbers, with the CP→RM roll-up), or None if not computed yet. Lets the
+    portal serve the full picture without touching / reading the Google Sheet."""
+    path = os.path.join(STATE_DIR, "rmcp_tabs.json")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path) as fh:
+            return json.load(fh).get(name)
+    except Exception:
+        log.warning("read rmcp_tabs cache failed")
+        return None
+
+
 def read_rm_quantity(timeout=40):
     """Read the RM Quantity tab from the RMCP sheet → list of row dicts."""
     sid = _rmcp_sheet_id()
@@ -805,6 +820,22 @@ def compute_rm(qty_field="to_plan"):
     # CP Req uses a smaller chunk (1000): it is the largest tab and every append
     # to it triggers the live pivot SUMIFs to recalc, so lighter POSTs keep each
     # Apps Script call well under its timeout and avoid the non-JSON/504 retries.
+    # Cache Django's computed tabs locally so the PORTAL can serve the COMPLETE
+    # numbers (direct RM + the CP→RM roll-up) without reading the Google Sheet,
+    # whose pivot formulas show only the direct-RM base. The sheet is untouched.
+    try:
+        with open(os.path.join(STATE_DIR, "rmcp_tabs.json"), "w") as fh:
+            json.dump({
+                "RM QTY": rm_qty_rows,
+                "RM Req": rm_req_rows,
+                "CP Req": cp_rows,
+                "Quantity Sheet": qty_sheet_rows,
+                "Against Demand RM": ad_rm_rows,
+                "Plan": plan_rows,
+            }, fh)
+    except Exception:
+        log.exception("cache rmcp_tabs failed")
+
     writes = {
         # Plan tab is RM Sourcing's INPUT now (read, not written) — leave it alone.
         CP_REQ_TAB: _write_tab_resumable(CP_REQ_TAB, CP_REQ_HEADERS, cp_rows, chunk=1000),
