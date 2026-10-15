@@ -356,7 +356,7 @@ function RuleDash({ ruleId, onBack }) {
         {calcCfg && <p className="sub" style={{ fontSize: 12.5, marginTop: 10 }}>💡 Click a code to see how its value was calculated and from which data.</p>}
         <Filters s={q} set={setQ} ph="Search" note={`${shown.length} of ${rows.length} rows · ${srcLabel}`} />
         <div style={{ overflowX: 'auto', marginTop: 10 }}>
-          <table className="mto-table" style={{ minWidth: 760 }}>
+          <table className="mto-table" style={{ width: '100%' }}>
             <thead><tr>{cols.map(c => <th key={c} className={NUMCOL.test(c) ? 'num' : undefined}>{c}</th>)}</tr></thead>
             <tbody>
               {shown.length === 0 ? <tr><td colSpan={cols.length || 1}>No rows in this sheet tab.</td></tr> :
@@ -524,7 +524,7 @@ export default function PPCRMSourcing() {
               </div>
               <Filters s={search} set={setSearch} ph="Search BOM code / family / customer" note={`${fgF.length} products`} />
               <div style={{ overflowX: 'auto', marginTop: 10 }}>
-                <table className="mto-table" style={{ minWidth: 800 }}>
+                <table className="mto-table" style={{ width: '100%' }}>
                   <thead><tr><th></th><th>BOM Code</th><th>Family</th><th>Customer</th><th className="num">Planned FG Qty</th><th className="num">RM Total (Kg)</th><th className="num">CP Demand (Nos)</th><th className="num">BOM Parts</th></tr></thead>
                   <tbody>
                     {fgF.length === 0 ? <tr><td colSpan={8}>No data — upload the BOM, then Recompute.</td></tr> :
@@ -558,7 +558,7 @@ export default function PPCRMSourcing() {
                             <table style={{ width: '100%', fontSize: 13 }}><tbody>
                               {parts.map((m, j) => <tr key={j}>
                                 <td style={{ fontFamily: 'monospace', fontSize: 12, padding: '2px 8px', whiteSpace: 'nowrap' }}>{m.code}</td>
-                                <td style={{ padding: '2px 8px', maxWidth: 340, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{(m.desc || '').replace(/ /g, ' ')}</td>
+                                <td style={{ padding: '2px 8px', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{(m.desc || '').replace(/ /g, ' ')}</td>
                                 <td style={{ padding: '2px 8px', whiteSpace: 'nowrap' }}>
                                   <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
                                     background: m.rm ? '#e3f2fd' : (cpType(m.code, m.desc) === 'Packing' ? '#e8f5e9' : '#f3e5f5'),
@@ -566,9 +566,9 @@ export default function PPCRMSourcing() {
                                     {m.rm ? 'RM' : cpType(m.code, m.desc)}
                                   </span>
                                 </td>
-                                <td style={{ textAlign: 'right', padding: '2px 8px', whiteSpace: 'nowrap' }}>
-                                  {dec(m.req)} {m.uom}
-                                  {m.bq != null && <span style={{ color: 'var(--muted)', fontSize: 11 }}> &nbsp;({fmt(r.planned)} × {dec(m.bq)} ÷ 1000)</span>}
+                                <td style={{ textAlign: 'right', padding: '2px 8px' }}>
+                                  <div style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{dec(m.req)} {m.uom}</div>
+                                  {m.bq != null && <div style={{ color: 'var(--muted)', fontSize: 10, whiteSpace: 'nowrap' }}>{fmt(r.planned)} × {dec(m.bq)} ÷ 1000</div>}
                                 </td>
                               </tr>)}
                               {/* R21 — multi-level roll-up: RM direct + RM via CP = RM total */}
@@ -629,7 +629,7 @@ export default function PPCRMSourcing() {
               </div>
               <Filters s={search} set={setSearch} ph="Search RM code / description" note={`${rmF.length} raw materials`} />
               <div style={{ overflowX: 'auto', marginTop: 10 }}>
-                <table className="mto-table" style={{ minWidth: 760 }}>
+                <table className="mto-table" style={{ width: '100%' }}>
                   <thead><tr><th>Item Code</th><th>Description</th><th className="num">Qty</th><th className="num">Reqd Qty</th><th>Source</th><th></th></tr></thead>
                   <tbody>
                     {rmF.length === 0 ? <tr><td colSpan={6}>No RM requirement yet.</td></tr> :
@@ -668,7 +668,7 @@ export default function PPCRMSourcing() {
               </div>
               <Filters s={search} set={setSearch} ph="Search item code / description" note={`${cpF.length} shown`} />
               <div style={{ overflowX: 'auto', marginTop: 10 }}>
-                <table className="mto-table" style={{ minWidth: 760 }}>
+                <table className="mto-table" style={{ width: '100%' }}>
                   <thead><tr><th>Item Code</th><th>Description</th><th>Type</th><th className="num">Requirement</th><th>UOM</th><th></th></tr></thead>
                   <tbody>
                     {cpF.length === 0 ? <tr><td colSpan={6}>No CP/packing requirement yet.</td></tr> :
