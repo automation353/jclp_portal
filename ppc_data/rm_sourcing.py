@@ -83,6 +83,16 @@ def _strip_p1(code):
     return c[2:].strip() if c[:2].upper() == "P1" else c
 
 
+def _strip_plant(code):
+    """Strip a leading plant prefix P1…P9 so a CP child 'CPxxx' matches its
+    recipe parent whether it is written 'P1CPxxx', 'P2CPxxx' or 'P3CPxxx'
+    (the CP's BOM can live under any plant, not just P1)."""
+    c = str(code).strip()
+    if len(c) > 2 and c[0] in ("P", "p") and c[1].isdigit():
+        return c[2:].strip()
+    return c
+
+
 def _is_rm(code):
     """Raw-material item codes start with RM or R1 (RMSS strips, R1A* metals)."""
     c = str(code).strip().upper()
@@ -541,7 +551,7 @@ def compute_rm(qty_field="to_plan"):
     # from another CP — memoised per code and guarded against cycles.
     bom_index = {}
     for _ln in cache["rows"]:
-        _k = _strip_p1(str(_ln["BOM Code"]).strip()).upper()
+        _k = _strip_plant(str(_ln["BOM Code"]).strip()).upper()
         bom_index.setdefault(_k, []).append((
             str(_ln["Item Code"]).strip(),
             _num(_ln["BOM Qty (per 1000)"]),
