@@ -8,7 +8,16 @@ const N = (v) => { const x = parseFloat(String(v).replace(/,/g, '')); return Num
 const fmt = (v) => N(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })
 const dec = (v) => N(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })
 function grade(d) { const s = (d || '').toUpperCase(); for (const g of ['304', '316', '201', '202', '430', '409']) if (s.includes(g)) return `SS ${g}`; return 'Other' }
-function cpType(code) { const s = (code || '').toUpperCase(); if (s.startsWith('CP')) return 'Component'; if (s.startsWith('PK') || s.startsWith('BC') || s.startsWith('PC')) return 'Packing'; return 'Other' }
+// Classify a non-RM part as Packing vs Component. Description-driven (reliable):
+// cartons/bags/labels = Packing; everything else non-RM is a Component. Prefix
+// is only a fallback — and NOT by 'PC' (PC codes are components, e.g. screws).
+function cpType(code, desc) {
+  const d = (desc || '').toLowerCase()
+  if (/carton|plastic ?bag|poly ?bag|\bbag\b|label|barcode|sticker|\btape\b|\bbox\b|bubble|corrugat|partition|\bliner\b/.test(d)) return 'Packing'
+  const s = (code || '').toUpperCase()
+  if (s.startsWith('PK') || s.startsWith('BC') || s.startsWith('PX')) return 'Packing'
+  return 'Component'
+}
 
 function Tile({ label, value, unit, kind = 'info', sub }) {
   return (
@@ -320,7 +329,7 @@ function RuleDash({ ruleId, onBack }) {
       : api.rmSourcingTab(cfg.tab).then(d => {
           if (!alive) return
           let rs = d.rows || []
-          if (cfg.filter === 'packing') rs = rs.filter(r => cpType(r['Item Code']) === 'Packing')
+          if (cfg.filter === 'packing') rs = rs.filter(r => cpType(r['Item Code'], r['Part Description']) === 'Packing')
           setRows(rs); setSheetUrl(d.sheet_url || '')
         })
     run.catch(() => { }).finally(() => { if (alive) setLoading(false) })
@@ -444,7 +453,7 @@ export default function PPCRMSourcing() {
     nosErp: (r['Qty in nos (ERP)'] || '').toString().trim(),
     reqd: (r['Reqd Qty'] || '').toString().trim(),
     nosCorr: (r['Qty in nos (Correction)'] || '').toString().trim(),
-    type: cpType(r['Item Code']),
+    type: cpType(r['Item Code'], r['Description']),
   })), [cp])
 
   const s = search.toLowerCase()
@@ -461,7 +470,7 @@ export default function PPCRMSourcing() {
   const cpLines = fgs.reduce((a, b) => a + (b.parts ? b.parts.length : 0), 0)
   const rmKg = rmq.reduce((a, r) => a + N(r.Qty), 0)
   const manualOverrides = rmq.filter(r => (r['Reqd Qty (in kgs)'] || r['Reqd Qty'] || '').toString().trim()).length
-  const packCount = cp.filter(r => cpType(r['Item Code']) === 'Packing').length
+  const packCount = cp.filter(r => cpType(r['Item Code'], r['Description']) === 'Packing').length
   const viaCpFgs = fgs.filter(b => N(b.rm_via_cp)).length
   const liveData = {
     R20: { stat: `${fmt(fgs.length)} FGs exploded · ${fmt(cpLines)} CP-Req lines`, tab: 'bom' },
@@ -552,9 +561,9 @@ export default function PPCRMSourcing() {
                                 <td style={{ padding: '2px 8px', maxWidth: 340, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{(m.desc || '').replace(/ /g, ' ')}</td>
                                 <td style={{ padding: '2px 8px', whiteSpace: 'nowrap' }}>
                                   <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
-                                    background: m.rm ? '#e3f2fd' : (cpType(m.code) === 'Packing' ? '#e8f5e9' : '#f3e5f5'),
-                                    color: m.rm ? '#1565c0' : (cpType(m.code) === 'Packing' ? '#2e7d32' : '#6a1b9a') }}>
-                                    {m.rm ? 'RM' : cpType(m.code)}
+                                    background: m.rm ? '#e3f2fd' : (cpType(m.code, m.desc) === 'Packing' ? '#e8f5e9' : '#f3e5f5'),
+                                    color: m.rm ? '#1565c0' : (cpType(m.code, m.desc) === 'Packing' ? '#2e7d32' : '#6a1b9a') }}>
+                                    {m.rm ? 'RM' : cpType(m.code, m.desc)}
                                   </span>
                                 </td>
                                 <td style={{ textAlign: 'right', padding: '2px 8px', whiteSpace: 'nowrap' }}>
