@@ -93,10 +93,22 @@ def _strip_plant(code):
     return c
 
 
-def _is_rm(code):
-    """Raw-material item codes start with RM or R1 (RMSS strips, R1A* metals)."""
+import re as _re
+# Raw material by description — SS/MS strip, wire, rod, coil, copper stock.
+# Verified against the BOM: these keywords match only raw materials (none have
+# a recipe), so they never catch an in-house component.
+_RM_DESC_RE = _re.compile(
+    r"\b(ss strip|ms strip|strip|wire|rod|coil|copper|beryllium)\b", _re.I)
+
+
+def _is_rm(code, desc=""):
+    """Raw material: code starts with RM/R1 (RMSS strips, R1A* metals), OR the
+    description names raw stock (strip/wire/rod/coil/copper) — this catches
+    DR1*/DR2*/PR1*/R2A*/QR2*/CB*/BOZCRD* strips & wires that the prefix misses."""
     c = str(code).strip().upper()
-    return c.startswith("RM") or c.startswith("R1")
+    if c.startswith("RM") or c.startswith("R1"):
+        return True
+    return bool(desc) and bool(_RM_DESC_RE.search(str(desc)))
 # RMCP "BOM" tab columns (match RMCP_AppsScript.gs).
 BOM_HEADERS = ["BOM Code", "Item Code", "BOM Qty (per 1000)", "UOM",
                "Part Description"]
@@ -577,7 +589,7 @@ def compute_rm(qty_field="to_plan"):
             stack = _stack | {key}
             for _child, _q1000, _uom, _desc in kids:
                 per = _q1000 / 1000.0        # per 1 unit of this part
-                if _is_rm(_child):
+                if _is_rm(_child, _desc):
                     e = out.setdefault(_child, {"req": 0.0, "desc": _desc, "uom": _uom})
                     e["req"] += per
                 else:                        # nested CP → recurse
@@ -613,7 +625,7 @@ def compute_rm(qty_field="to_plan"):
         green_req = greenq * qty / 1000.0     # RM green = roll up FG green via BOM
         desc = line.get("Part Description", "")
         uom = line.get("UOM", "")
-        is_rm = _is_rm(child)
+        is_rm = _is_rm(child, desc)
         if planq > 0:
             cp_rows.append({
                 "BOM Code": parent, "Item Code": child,
@@ -713,7 +725,7 @@ def compute_rm(qty_field="to_plan"):
     # columns as the reference RM Req / CP Req. The aggregated RM total per code
     # lives in RM QTY (reference does the same: RM Req is detail, RM QTY is the
     # SUMIF pivot). Our dump is single-level, so BOM Code is the FG parent.
-    rm_req_rows = [r for r in cp_rows if _is_rm(r["Item Code"])]
+    rm_req_rows = [r for r in cp_rows if _is_rm(r["Item Code"], r.get("Part Description", ""))]
     # Append the via-CP back-trace lines so RM Req (detail) foots to RM QTY
     # (direct + via-CP). These are tagged "[via CP <code>]" in the description.
     rm_req_rows = rm_req_rows + rm_via_cp_rows
