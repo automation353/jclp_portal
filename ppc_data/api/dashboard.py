@@ -22,7 +22,7 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 
-from .models import PPCComputeResult, PPCUploadBatch
+from ppc_data.models import PPCComputeResult, PPCUploadBatch
 
 log = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ def _cached_or_compute(compute_key, compute_fn, *args):
 def dashboard_capacity(request):
     """Plan vs capacity by product group by date."""
     month = _get_month(request)
-    from .compute_dashboard import compute_plan_vs_capacity
+    from ppc_data.compute.dashboard import compute_plan_vs_capacity
     data, cached = _cached_or_compute(f"capacity_{month}", compute_plan_vs_capacity, month)
     return Response({"month": month, "cached": cached, "data": data})
 
@@ -88,7 +88,7 @@ def dashboard_capacity(request):
 def dashboard_adherence(request):
     """Adherence split by category (OEM/Market/Fleetguard/Export)."""
     month = _get_month(request)
-    from .compute_dashboard import compute_adherence_dashboard
+    from ppc_data.compute.dashboard import compute_adherence_dashboard
     data, cached = _cached_or_compute(f"adherence_{month}", compute_adherence_dashboard, month)
     return Response({"month": month, "cached": cached, "data": data})
 
@@ -96,7 +96,7 @@ def dashboard_adherence(request):
 @api_view(["GET"])
 def dashboard_stock(request):
     """Stock levels — items in red/yellow/green/blue."""
-    from .compute_dashboard import compute_stock_levels
+    from ppc_data.compute.dashboard import compute_stock_levels
     data, cached = _cached_or_compute("stock_levels", compute_stock_levels)
     return Response({"cached": cached, "data": data})
 
@@ -105,7 +105,7 @@ def dashboard_stock(request):
 def dashboard_shortages(request):
     """Shortage board — material short inside lead time."""
     month = _get_month(request)
-    from .compute_dashboard import compute_shortage_board
+    from ppc_data.compute.dashboard import compute_shortage_board
     data, cached = _cached_or_compute(f"shortages_{month}", compute_shortage_board, month)
     return Response({"month": month, "cached": cached, "data": data})
 
@@ -114,7 +114,7 @@ def dashboard_shortages(request):
 def dashboard_oee(request):
     """OEE by section and line."""
     month = _get_month(request)
-    from .compute_dashboard import compute_oee
+    from ppc_data.compute.dashboard import compute_oee
     data, cached = _cached_or_compute(f"oee_{month}", compute_oee, month)
     return Response({"month": month, "cached": cached, "data": data})
 
@@ -123,7 +123,7 @@ def dashboard_oee(request):
 def dashboard_opening(request):
     """Opening balance for next cycle — Phase 10 gate."""
     month = _get_month(request)
-    from .compute_dashboard import derive_opening_balance
+    from ppc_data.compute.dashboard import derive_opening_balance
     data, cached = _cached_or_compute(f"opening_{month}", derive_opening_balance, month)
     return Response({"month": month, "cached": cached, "data": data})
 
@@ -133,7 +133,7 @@ def dashboard_opening(request):
 def dashboard_refresh(request):
     """Refresh all dashboards for a month."""
     month = _get_month(request)
-    from .compute_dashboard import refresh_dashboard
+    from ppc_data.compute.dashboard import refresh_dashboard
 
     try:
         result = refresh_dashboard(month, user=request.user)
@@ -236,7 +236,7 @@ def parallel_run_compare(request):
 
     Compares total_plan per item and reports variance.
     """
-    from .field_maps.helpers import num0
+    from ppc_data.field_maps.helpers import num0
 
     # Load computed plan
     computed_batch = (

@@ -15,7 +15,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import PPCDataRow, PPCRelease, PPCUploadBatch
+from ppc_data.models import PPCDataRow, PPCRelease, PPCUploadBatch
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def material_explode(request):
     POST body:
       release_id  — ID of the active PPCRelease
     """
-    from .compute_material import run_bom_explosion
+    from ppc_data.compute.material import run_bom_explosion
 
     release_id = request.data.get("release_id")
     if not release_id:
@@ -52,7 +52,7 @@ def material_explode(request):
 
     # Push to Google Sheets via n8n (non-blocking — failures don't break the API)
     try:
-        from .sheet_sync import sync_material_to_ppc_sheet
+        from ppc_data.compute.sheet_sync import sync_material_to_ppc_sheet
         release = PPCRelease.objects.get(pk=release_id)
         sheet_result = sync_material_to_ppc_sheet(release)
         summary["sheet_sync"] = sheet_result
@@ -70,7 +70,7 @@ def material_allocate(request):
     POST body:
       release_id  — ID of the active PPCRelease
     """
-    from .compute_material import run_stock_allocation
+    from ppc_data.compute.material import run_stock_allocation
 
     release_id = request.data.get("release_id")
     if not release_id:
@@ -94,7 +94,7 @@ def material_allocate(request):
 
     # Push BOM + shortage data to Google Sheets (non-blocking)
     try:
-        from .sheet_sync import sync_bom_to_sheet
+        from ppc_data.compute.sheet_sync import sync_bom_to_sheet
         release = PPCRelease.objects.get(pk=release_id)
         sheet_result = sync_bom_to_sheet(release)
         summary["sheet_sync"] = sheet_result
@@ -112,7 +112,7 @@ def material_sheet_sync(request):
     POST body:
       release_id  — ID of the PPCRelease (or omit for latest active)
     """
-    from .sheet_sync import sync_bom_to_sheet, sync_material_to_ppc_sheet
+    from ppc_data.compute.sheet_sync import sync_bom_to_sheet, sync_material_to_ppc_sheet
 
     release_id = request.data.get("release_id")
     if release_id:

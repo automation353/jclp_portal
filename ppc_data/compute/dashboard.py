@@ -24,8 +24,8 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
-from .field_maps.helpers import num0, txt
-from .models import (
+from ppc_data.field_maps.helpers import num0, txt
+from ppc_data.models import (
     PPCCapacityFlag,
     PPCComputeResult,
     PPCDataRow,

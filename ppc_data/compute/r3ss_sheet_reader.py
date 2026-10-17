@@ -70,15 +70,29 @@ _EXACT_MAP = {
     "color": "colour",
     "section": "section",
     "product group": "product_group",
+    "stamping": "stamping",
+    "atmc group": "atmc_group",
+    "atmc grp": "atmc_group",
     "plant": "plant",
     "strip weight": "strip_weight",
     "asp": "asp",
     "ebq": "ebq",
     "red level": "red_level",
     "blue level": "blue_level",
+    # The sheet names the colour-band thresholds RL / GL / BL, not
+    # "Red/Green/Blue Level" — map them so the dashboard shows the values.
+    "rl": "red_level",
+    "bl": "blue_level",
 }
 
 _DATE_RE = re.compile(r"(\d{1,2})\s*[-/]\s*(\d{1,2})")
+
+
+def _jolly_key(code):
+    """Normalise a jolly code for MTO/MTS matching: trim, collapse internal
+    whitespace, uppercase — so 'TS M05  B06' and 'TS M05 B06' link to the same
+    part (guards the linkage against stray double-spaces in either source)."""
+    return re.sub(r"\s+", " ", str(code or "").strip()).upper()
 
 
 def _norm(header):
@@ -145,7 +159,7 @@ def _load_mto_mts_live(timeout=60):
     for r in rows[1:]:
         if ic >= len(r):
             continue
-        code = (r[ic] or "").strip().upper()
+        code = _jolly_key(r[ic])
         if not code:
             continue
         status = (r[fs] or "").strip().upper() if fs < len(r) else ""
@@ -259,7 +273,7 @@ def read_r3ss_rows(tab_name="R3SS", timeout=30):
     if live:
         for row in out_rows:
             d = row["data"]
-            jolly = (d.get("jolly_code") or "").strip().upper()
+            jolly = _jolly_key(d.get("jolly_code"))
             d["mto_mts"] = live.get(jolly, "NA")
 
     return {"rows": out_rows, "row_count": len(out_rows), "plan_month": plan_month}

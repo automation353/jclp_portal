@@ -15,8 +15,8 @@ from datetime import date as dt_date
 
 from django.utils import timezone
 
-from .field_maps.helpers import num0, txt
-from .models import (
+from ppc_data.field_maps.helpers import num0, txt
+from ppc_data.models import (
     PPCCapacityFlag,
     PPCDataRow,
     PPCFeasibilityRun,

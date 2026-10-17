@@ -30,8 +30,8 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
-from .field_maps.helpers import num0, txt
-from .models import (
+from ppc_data.field_maps.helpers import num0, txt
+from ppc_data.models import (
     PPCDataRow,
     PPCDemandFreeze,
     PPCDemandTransaction,
@@ -501,7 +501,7 @@ def compute_mps(month, user=None):
     # ── 4. Sync to Google Sheet (fire-and-forget) ──
     sheet_sync_result = None
     try:
-        from .sheet_sync import sync_upload_to_sheet
+        from ppc_data.compute.sheet_sync import sync_upload_to_sheet
         sheet_sync_result = sync_upload_to_sheet(batch)
     except Exception:
         log.exception("MPS sheet sync failed (non-blocking)")

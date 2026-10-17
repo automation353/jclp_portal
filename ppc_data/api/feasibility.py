@@ -22,7 +22,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import (
+from ppc_data.models import (
     PPCCapacityFlag,
     PPCDataRow,
     PPCFeasibilityRun,
@@ -42,7 +42,7 @@ def feasibility_run(request):
 
     Creates a new PPCFeasibilityRun and populates PPCCapacityFlag rows.
     """
-    from .compute_feasibility import run_feasibility
+    from ppc_data.compute.feasibility import run_feasibility
 
     plan_batch = (
         PPCUploadBatch.objects
@@ -248,7 +248,7 @@ def release_create(request):
     plan_rows = list(plan_batch.rows.values_list("data", flat=True))
 
     # Build summary
-    from .field_maps.helpers import num0 as n0
+    from ppc_data.field_maps.helpers import num0 as n0
     from collections import defaultdict
     sections = defaultdict(lambda: {"items": 0, "total_plan": 0})
     dates_seen = set()
@@ -307,7 +307,7 @@ def release_create(request):
     # Sheet sync — push release snapshot (fire-and-forget)
     sheet_sync = None
     try:
-        from .sheet_sync import sync_upload_to_sheet
+        from ppc_data.compute.sheet_sync import sync_upload_to_sheet
         sheet_sync = sync_upload_to_sheet(snapshot_batch)
     except Exception:
         log.exception("Release sheet sync failed (non-blocking)")

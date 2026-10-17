@@ -24,7 +24,7 @@ import requests
 
 log = logging.getLogger(__name__)
 
-STATE_DIR = os.path.join(os.path.dirname(__file__), "rm_sourcing_state")
+STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "rm_sourcing_state")
 
 BOM_TAB = "BOM"                       # source dump (only non-reference tab kept)
 PLAN_TAB = "Plan"
@@ -634,9 +634,11 @@ def compute_rm(qty_field="to_plan"):
         planq = plan.get(pkey, 0.0)
         demandq = demand.get(pkey, 0.0)
         greenq = green.get(pkey, 0.0)
-        if planq <= 0 and greenq <= 0 and demandq <= 0:
-            continue                      # parent not planned / stocked / demanded
-        matched_parents.add(pkey)
+        # Process EVERY BOM line so CP Req / RM Req / RM QTY list the full universe
+        # of CPs and RMs (reference behaviour). Un-planned parents contribute Qty 0
+        # but their codes still appear. Only planned parents count as "matched".
+        if planq > 0 or greenq > 0 or demandq > 0:
+            matched_parents.add(pkey)
         qty = _num(line["BOM Qty (per 1000)"])
         req = planq * qty / 1000.0            # to_plan explosion  → CP Req / RM QTY
         dem = demandq * qty / 1000.0          # total-demand explosion
@@ -644,13 +646,15 @@ def compute_rm(qty_field="to_plan"):
         desc = line.get("Part Description", "")
         uom = line.get("UOM", "")
         is_rm = _is_rm(child, desc)
+        # CP Req lists EVERY BOM line (all CPs + RMs + packing), Qty 0 where the
+        # parent isn't planned — so the tab is the complete BOM, like the reference.
+        cp_rows.append({
+            "BOM Code": parent, "Item Code": child,
+            "BOM Qty": qty, "Qty in Nos": round(planq),
+            "Qty (Base UOM)": round(req, 3), "UOM": uom,
+            "Part Description": desc,
+        })
         if planq > 0:
-            cp_rows.append({
-                "BOM Code": parent, "Item Code": child,
-                "BOM Qty": qty, "Qty in Nos": round(planq),
-                "Qty (Base UOM)": round(req, 3), "UOM": uom,
-                "Part Description": desc,
-            })
             # Product-centric: this FG (BOM Code) → EVERY component it consumes
             # (RM + CP + packing), so the By Product view shows the whole BOM.
             bb = by_bom.get(pkey)

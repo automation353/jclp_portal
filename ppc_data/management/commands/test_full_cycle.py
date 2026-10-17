@@ -108,7 +108,7 @@ class Command(BaseCommand):
         """Upload a file through the parser pipeline."""
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        from ppc_data.api import _detect_table_key
+        from ppc_data.api.uploads import _detect_table_key
         from ppc_data.models import PPCDataRow, PPCUploadBatch
         from ppc_data.parsers import PARSERS
 
@@ -269,7 +269,7 @@ class Command(BaseCommand):
     def _run_feasibility(self, user):
         """Run feasibility checks on the current R3SS plan."""
         from ppc_data.models import PPCCapacityFlag, PPCFeasibilityRun, PPCUploadBatch
-        from ppc_data.compute_feasibility import run_feasibility
+        from ppc_data.compute.feasibility import run_feasibility
         from django.utils import timezone
 
         plan_batch = PPCUploadBatch.objects.filter(
@@ -392,7 +392,7 @@ class Command(BaseCommand):
 
     def _run_material(self, release_id, user):
         """Run BOM explosion and stock allocation."""
-        from ppc_data.compute_material import run_bom_explosion, run_stock_allocation
+        from ppc_data.compute.material import run_bom_explosion, run_stock_allocation
 
         # BOM explosion
         try:
@@ -482,7 +482,7 @@ class Command(BaseCommand):
     def _sheet_sync(self, release_id):
         """Push data to Google Sheets via n8n webhooks."""
         from ppc_data.models import PPCRelease
-        from ppc_data.sheet_sync import sync_bom_to_sheet, sync_material_to_ppc_sheet
+        from ppc_data.compute.sheet_sync import sync_bom_to_sheet, sync_material_to_ppc_sheet
 
         release = PPCRelease.objects.get(pk=release_id)
 
@@ -513,7 +513,7 @@ class Command(BaseCommand):
     def _sync_erp_to_sheet(self):
         """Sync all current ERP batches to the TCS ION Google Sheet."""
         from ppc_data.models import PPCUploadBatch
-        from ppc_data.sheet_sync import sync_erp_to_sheet
+        from ppc_data.compute.sheet_sync import sync_erp_to_sheet
 
         erp_batches = (
             PPCUploadBatch.objects

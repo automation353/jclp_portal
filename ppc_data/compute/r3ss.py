@@ -31,8 +31,8 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
-from .field_maps.helpers import num0, txt
-from .models import (
+from ppc_data.field_maps.helpers import num0, txt
+from ppc_data.models import (
     PPCDataRow,
     PPCDemandFreeze,
     PPCDemandTransaction,
@@ -1025,7 +1025,7 @@ def run_control_tests(plan_rows, day_map, month):
     # Test 6: Shortfall rows without a reason code → expected 0
     # Rule 5: capacity is a gate — plan cannot release without passing.
     # Query the latest feasibility run for this plan month.
-    from .models import PPCFeasibilityRun
+    from ppc_data.models import PPCFeasibilityRun
     latest_run = (
         PPCFeasibilityRun.objects
         .filter(plan_month=month)
@@ -1108,7 +1108,7 @@ def run_control_tests(plan_rows, day_map, month):
 
     # Test 9: Initial demand rows edited after month open → expected 0
     # PPCDemandFreeze is immutable by design — check via audit
-    from .models import PPCDemandFreeze
+    from ppc_data.models import PPCDemandFreeze
     # If a freeze was re-created (different batch) for the same month,
     # that's a violation. We check if any freeze has been modified.
     # By design, get_or_create skips existing — so this should always be 0.
@@ -1123,7 +1123,7 @@ def run_control_tests(plan_rows, day_map, month):
 
     # Test 10: Parallel run — portal total plan vs uploaded R3 SS.xlsx
     # Semi-automated: compares if both computed and uploaded plans exist.
-    from .field_maps.helpers import num0 as _n0
+    from ppc_data.field_maps.helpers import num0 as _n0
     computed_batch = (
         PPCUploadBatch.objects
         .filter(table_key="r3ss_plan", is_current=True, file_type="computed")
@@ -1303,7 +1303,7 @@ def compute_r3ss(month, user=None):
     # Push PLAN batch to PPC Data sheet, plus full R3SS sheet sync
     sheet_sync_result = {}
     try:
-        from .sheet_sync import sync_r3ss_to_sheet, sync_upload_to_sheet
+        from ppc_data.compute.sheet_sync import sync_r3ss_to_sheet, sync_upload_to_sheet
         sheet_sync_result["plan"] = sync_upload_to_sheet(batch)
         sheet_sync_result["r3ss_tabs"] = sync_r3ss_to_sheet(month)
     except Exception:

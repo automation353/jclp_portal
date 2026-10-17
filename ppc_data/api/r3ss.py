@@ -21,10 +21,10 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from .api import _store_file
-from .models import PPCDataRow, PPCUploadBatch
-from .parsers.r3ss_file import parse as parse_r3ss, parse_summary
-from .serializers import PPCUploadBatchSerializer
+from ppc_data.api.uploads import _store_file
+from ppc_data.models import PPCDataRow, PPCUploadBatch
+from ppc_data.parsers.r3ss_file import parse as parse_r3ss, parse_summary
+from ppc_data.serializers import PPCUploadBatchSerializer
 
 log = logging.getLogger(__name__)
 
@@ -388,7 +388,7 @@ def r3ss_from_sheet(request):
 
     Optional ?search=xyz filters rows by any field value (case-insensitive).
     """
-    from .r3ss_sheet_reader import read_r3ss_rows
+    from ppc_data.compute.r3ss_sheet_reader import read_r3ss_rows
 
     try:
         result = read_r3ss_rows()
@@ -429,13 +429,13 @@ def r3ss_recompute_sheet(request):
 
     MTO/MTS runs first so the Apps Script hook reads the freshly-written data.
     """
-    from .r3ss_sheet_reader import read_r3ss_rows, trigger_recompute
+    from ppc_data.compute.r3ss_sheet_reader import read_r3ss_rows, trigger_recompute
 
     # (1) Rebuild MTO_MTS / EBQ Calc from the cached register aggregates first,
     # so the R3SS compute's hook patches the column from current data.
     mto_mts = None
     try:
-        from .mto_mts_compute import compute_and_write
+        from ppc_data.compute.mto_mts_compute import compute_and_write
         mto_mts = compute_and_write()
         log.info("MTO/MTS recompute: %s",
                  {k: v for k, v in mto_mts.items() if k != "writes"})
@@ -501,7 +501,7 @@ def r3ss_recompute_sheet(request):
 @api_view(["GET"])
 def r3ss_summary(request):
     """R3SS summary tiles — plan overview."""
-    from .field_maps.helpers import num0
+    from ppc_data.field_maps.helpers import num0
 
     plan_batch = (
         PPCUploadBatch.objects
@@ -634,7 +634,7 @@ def r3ss_compute(request):
     if not month or len(month) != 7:
         month = timezone.now().strftime("%Y-%m")
 
-    from .compute_r3ss import compute_r3ss
+    from ppc_data.compute.r3ss import compute_r3ss
 
     try:
         result = compute_r3ss(month, user=request.user)

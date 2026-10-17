@@ -21,10 +21,10 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from .field_maps.erp import ERP_REGISTRY, get_erp_field_map
-from .models import PPCDataRow, PPCUploadBatch
-from .parsers import PARSERS
-from .serializers import PPCUploadBatchSerializer
+from ppc_data.field_maps.erp import ERP_REGISTRY, get_erp_field_map
+from ppc_data.models import PPCDataRow, PPCUploadBatch
+from ppc_data.parsers import PARSERS
+from ppc_data.serializers import PPCUploadBatchSerializer
 
 log = logging.getLogger(__name__)
 
@@ -275,7 +275,7 @@ def upload(request):
     # ── RM Sourcing (RMCP): BOM dump → trimmed → RMCP sheet via the RMCP
     # webhook. Fully isolated from the R3SS/MTO-MTS pipeline. ──
     if table_key == "bom":
-        from .rm_sourcing import ingest_bom
+        from ppc_data.compute.rm_sourcing import ingest_bom
 
         try:
             bom_result = ingest_bom(stored_path, original_name, uploader=str(request.user))
@@ -294,7 +294,7 @@ def upload(request):
     # sheet — that chunked write was truncating the FY tab). The MTO/MTS engine
     # reads this cached aggregate on Recompute. ──
     if table_key in ("sales_register", "sales_register_fy"):
-        from .mto_mts_compute import ingest_register
+        from ppc_data.compute.mto_mts_compute import ingest_register
 
         kind = "fy" if table_key == "sales_register_fy" else "current"
         try:
@@ -314,9 +314,9 @@ def upload(request):
         }, status=status.HTTP_201_CREATED)
 
     # ── R3SS source files: raw passthrough to n8n (no Django storage) ──
-    from .sheet_sync import _RAW_SHEET_CONFIG
+    from ppc_data.compute.sheet_sync import _RAW_SHEET_CONFIG
     if table_key in _RAW_SHEET_CONFIG:
-        from .sheet_sync import sync_raw_to_sheet
+        from ppc_data.compute.sheet_sync import sync_raw_to_sheet
 
         sync_result = None
         try:
@@ -426,20 +426,20 @@ def upload(request):
     sync_result = None
     if is_erp:
         try:
-            from .sheet_sync import sync_erp_to_sheet
+            from ppc_data.compute.sheet_sync import sync_erp_to_sheet
             sync_result = sync_erp_to_sheet(batch)
             log.info("ERP sheet sync for %s: %s", table_key, sync_result)
         except Exception:
             log.exception("ERP sheet sync failed for %s (non-blocking)", table_key)
             sync_result = {"ok": False, "error": "sync exception"}
         try:
-            from .sheet_sync import sync_erp_load_log
+            from ppc_data.compute.sheet_sync import sync_erp_load_log
             sync_erp_load_log(batch, sync_result=sync_result)
         except Exception:
             log.exception("ERP _LOAD_LOG sync failed for %s (non-blocking)", table_key)
     else:
         try:
-            from .sheet_sync import sync_upload_to_sheet
+            from ppc_data.compute.sheet_sync import sync_upload_to_sheet
             sync_result = sync_upload_to_sheet(batch)
             log.info("Data sheet sync for %s: %s", table_key, sync_result)
         except Exception:
@@ -672,7 +672,7 @@ def _maybe_freeze_fg_stock_open(batch, rekeyed_rows):
 
     # Sync the frozen snapshot to its own sheet tab
     try:
-        from .sheet_sync import sync_erp_to_sheet
+        from ppc_data.compute.sheet_sync import sync_erp_to_sheet
         sync_result = sync_erp_to_sheet(open_batch)
         log.info("FG_STOCK_OPEN sheet sync: %s", sync_result)
     except Exception:
@@ -767,7 +767,7 @@ def erp_landing(request):
 
     # Append to _LOAD_LOG (fire-and-forget)
     try:
-        from .sheet_sync import sync_erp_load_log
+        from ppc_data.compute.sheet_sync import sync_erp_load_log
         sync_erp_load_log(batch, sync_result={"ok": True})
     except Exception:
         log.exception("ERP _LOAD_LOG sync failed for %s (non-blocking)", report_key)
@@ -840,7 +840,7 @@ def feed_status(request):
 
     # Build master upload status
     master_status = []
-    from .field_maps import REGISTRY as MASTER_REGISTRY
+    from ppc_data.field_maps import REGISTRY as MASTER_REGISTRY
     for key in sorted(MASTER_REGISTRY.keys()):
         entry = {"table_key": key, "field_count": len(MASTER_REGISTRY[key]["field_map"])}
         if key in batch_map:

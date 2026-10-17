@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 @api_view(["POST"])
 def rm_recompute(request):
     """Re-explode the cached BOM against the current R3SS plan."""
-    from .rm_sourcing import compute_rm
+    from ppc_data.compute.rm_sourcing import compute_rm
     try:
         result = compute_rm()
     except Exception as exc:
@@ -27,7 +27,7 @@ def rm_recompute(request):
 def rm_quantity(request):
     """RM Quantity output — the COMPLETE total (direct RM + CP→RM roll-up),
     served from Django's local compute (not the sheet's direct-only pivot)."""
-    from .rm_sourcing import _cached_tab, read_rm_quantity
+    from ppc_data.compute.rm_sourcing import _cached_tab, read_rm_quantity
     rows = _cached_tab("RM QTY")
     if rows is None:
         rows = read_rm_quantity()
@@ -38,7 +38,7 @@ def rm_quantity(request):
 def rm_by_bom(request):
     """Product-centric view: each FG (BOM Code) → its RM needs (expandable)."""
     import os
-    from .rm_sourcing import read_rm_by_bom
+    from ppc_data.compute.rm_sourcing import read_rm_by_bom
     rows = read_rm_by_bom()
     sid = os.environ.get("JCLP_RMCP_SHEET_ID", "").strip()
     sheet_url = f"https://docs.google.com/spreadsheets/d/{sid}/edit" if sid else ""
@@ -49,7 +49,7 @@ def rm_by_bom(request):
 def cp_req(request):
     """CP + packing requirement (Quantity Sheet) — from Django's local compute."""
     import os
-    from .rm_sourcing import _cached_tab, read_quantity_sheet
+    from ppc_data.compute.rm_sourcing import _cached_tab, read_quantity_sheet
     rows = _cached_tab("Quantity Sheet")
     if rows is None:
         rows = read_quantity_sheet()
@@ -61,7 +61,7 @@ def cp_req(request):
 @api_view(["GET"])
 def data_quality(request):
     """Rule 19 — item code ↔ description check over the cached BOM (read-only)."""
-    from .rm_sourcing import check_data_quality
+    from ppc_data.compute.rm_sourcing import check_data_quality
     return Response(check_data_quality())
 
 
@@ -76,7 +76,7 @@ def sheet_tab(request):
     Django's local compute (COMPLETE, with the roll-up); BOM falls back to the
     Google Sheet."""
     import os
-    from .rm_sourcing import _read_tab, _cached_tab
+    from ppc_data.compute.rm_sourcing import _read_tab, _cached_tab
     tab = (request.GET.get("tab") or "").strip()
     if tab not in _RMCP_TABS:
         return Response({"ok": False, "error": f"unknown tab: {tab}"})
@@ -92,7 +92,7 @@ def sheet_tab(request):
 @api_view(["GET"])
 def rm_usage(request):
     """Which FGs consume a given RM (?rm=<code>)."""
-    from .rm_sourcing import read_rm_usage
+    from ppc_data.compute.rm_sourcing import read_rm_usage
     rm = request.GET.get("rm", "").strip()
     rows = read_rm_usage(rm)
     return Response({"rm": rm, "row_count": len(rows), "rows": rows})

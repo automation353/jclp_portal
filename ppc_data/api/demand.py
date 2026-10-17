@@ -19,10 +19,10 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
-from .api import _store_file
-from .field_maps.helpers import num0
-from .models import PPCDataRow, PPCDemandFreeze, PPCDemandTransaction, PPCUploadBatch
-from .parsers.forecast_demand import parse as parse_demand, parse_transactions
+from ppc_data.api.uploads import _store_file
+from ppc_data.field_maps.helpers import num0
+from ppc_data.models import PPCDataRow, PPCDemandFreeze, PPCDemandTransaction, PPCUploadBatch
+from ppc_data.parsers.forecast_demand import parse as parse_demand, parse_transactions
 
 log = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ def demand_freeze(request):
 
     # Sync to DEMAND Google Sheet (fire-and-forget)
     try:
-        from .sheet_sync import sync_demand_sheet
+        from ppc_data.compute.sheet_sync import sync_demand_sheet
         sheet_result = sync_demand_sheet(month)
         log.info("Demand sheet sync for %s: %s", month, sheet_result)
     except Exception:
@@ -276,7 +276,7 @@ def demand_transaction(request):
 
     # Sync to DEMAND Google Sheet (fire-and-forget)
     try:
-        from .sheet_sync import sync_demand_sheet
+        from ppc_data.compute.sheet_sync import sync_demand_sheet
         sheet_result = sync_demand_sheet(month)
         log.info("Demand sheet sync for %s: %s", month, sheet_result)
     except Exception:
@@ -452,7 +452,7 @@ def demand_sync_sheet(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    from .sheet_sync import sync_demand_sheet
+    from ppc_data.compute.sheet_sync import sync_demand_sheet
     results = sync_demand_sheet(month)
 
     return Response({

@@ -14,8 +14,8 @@ from collections import defaultdict
 
 from django.db import transaction
 
-from .field_maps.helpers import num0, txt
-from .models import PPCDataRow, PPCRelease, PPCUploadBatch
+from ppc_data.field_maps.helpers import num0, txt
+from ppc_data.models import PPCDataRow, PPCRelease, PPCUploadBatch
 
 log = logging.getLogger(__name__)
 

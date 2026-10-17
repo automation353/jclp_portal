@@ -25,7 +25,7 @@ import os
 
 import requests
 
-from .field_maps.helpers import num0
+from ppc_data.field_maps.helpers import num0
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ def sync_bom_to_sheet(release):
       - shortages: components with insufficient stock
       - summary: overview tiles
     """
-    from .models import PPCDataRow, PPCUploadBatch
+    from ppc_data.models import PPCDataRow, PPCUploadBatch
 
     url = _pipeline_webhook()
     if not url:
@@ -225,7 +225,7 @@ def sync_scorecard_to_sheet(release):
     """Push adherence scorecard to Google Sheets via n8n."""
     from django.db.models import Sum
 
-    from .models import PPCDataRow, PPCProductionEntry, PPCRejectionEntry
+    from ppc_data.models import PPCDataRow, PPCProductionEntry, PPCRejectionEntry
 
     url = _pipeline_webhook()
     if not url:
@@ -315,7 +315,7 @@ def sync_material_to_ppc_sheet(release):
     This bridges L7 (new pipeline) → existing Google Sheet (transition).
     Uses the same webhook as ppc/api.py (JCLP_PPC_SHEET_WEBHOOK).
     """
-    from .models import PPCDataRow, PPCUploadBatch
+    from ppc_data.models import PPCDataRow, PPCUploadBatch
 
     url = _ppc_sheet_webhook()
     if not url:
@@ -432,8 +432,8 @@ def sync_erp_to_sheet(batch):
         return {"attempted": False, "reason": f"no tab mapping for {table_key}"}
 
     # Load rows and convert to header-keyed dicts for the sheet
-    from .field_maps.erp import get_erp_field_map
-    from .models import PPCDataRow
+    from ppc_data.field_maps.erp import get_erp_field_map
+    from ppc_data.models import PPCDataRow
 
     field_map = get_erp_field_map(table_key)
     rows_raw = list(
@@ -531,8 +531,8 @@ def sync_master_to_sheet(batch):
         if not url:
             return {"attempted": False, "reason": "neither MASTERS nor DATA webhook set"}
 
-    from .field_maps import REGISTRY
-    from .models import PPCDataRow
+    from ppc_data.field_maps import REGISTRY
+    from ppc_data.models import PPCDataRow
 
     reg_entry = REGISTRY.get(table_key)
     field_map = reg_entry["field_map"] if reg_entry else None
@@ -672,8 +672,8 @@ def sync_upload_to_sheet(batch):
     if not tab_name:
         return {"attempted": False, "reason": f"no tab mapping for {table_key}"}
 
-    from .field_maps import REGISTRY
-    from .models import PPCDataRow
+    from ppc_data.field_maps import REGISTRY
+    from ppc_data.models import PPCDataRow
 
     reg_entry = REGISTRY.get(table_key)
     field_map = reg_entry["field_map"] if reg_entry else None
@@ -784,6 +784,16 @@ _RAW_SHEET_CONFIG = {
     "mps_schedule_form": {
         "sheets": ["Schedule Form"],
         "tab_name": "Master",
+        # Write the whole Master in ONE payload (no chunking). The Master is a
+        # bounded FG catalogue (~3.3k rows) but WIDE (~113 cols). With the
+        # default 2000-row chunk, chunk 1 (clear + write) lands but the chunk-2
+        # APPEND silently fails for this wide tab (the append POST times out),
+        # so only the first 2000 rows reach the sheet and ~1,600 items — half
+        # the catalogue — were dropped on every upload. A single clear+write is
+        # the reliable path (same mechanism as a successful chunk 1); at ~10MB
+        # it stays under the n8n 16MB body limit. Raise this only if the
+        # catalogue ever approaches ~5k rows.
+        "chunk": 20000,
     },
     "fg_stock_statement": {
         # First two sheets ("main report", "Search Criteria") are empty/meta;
@@ -932,7 +942,7 @@ def _build_demand_rows(file_path):
     Demand Freeze tab is always aligned. The R3SS math still lives in Apps
     Script; this only makes the demand tab readable.
     """
-    from .parsers import forecast_demand
+    from ppc_data.parsers import forecast_demand
 
     parsed = forecast_demand.parse(file_path)
     agg = {}
@@ -1293,7 +1303,7 @@ def sync_r3ss_to_sheet(month):
         if not url:
             return {"attempted": False, "reason": "neither R3SS nor DATA webhook set"}
 
-    from .compute_r3ss import (
+    from ppc_data.compute.r3ss import (
         build_imp_demand,
         build_imp_dispatch,
         build_imp_fg,
@@ -1398,7 +1408,7 @@ def sync_demand_txn_to_sheet(month):
         if not url:
             return {"attempted": False, "reason": "neither DEMAND nor DATA webhook set"}
 
-    from .models import PPCDemandFreeze, PPCDemandTransaction
+    from ppc_data.models import PPCDemandFreeze, PPCDemandTransaction
 
     # Build INITIAL rows from the freeze table
     freezes = PPCDemandFreeze.objects.filter(month=month).select_related("frozen_by")
@@ -1479,7 +1489,7 @@ def sync_demand_part_to_sheet(month):
 
     from django.db.models import Sum
 
-    from .models import PPCDemandFreeze
+    from ppc_data.models import PPCDemandFreeze
 
     freezes = (
         PPCDemandFreeze.objects
@@ -1543,7 +1553,7 @@ def sync_trend_6m_to_sheet():
         if not url:
             return {"attempted": False, "reason": "neither DEMAND nor DATA webhook set"}
 
-    from .models import PPCDataRow, PPCUploadBatch
+    from ppc_data.models import PPCDataRow, PPCUploadBatch
 
     now = timezone.now()
 

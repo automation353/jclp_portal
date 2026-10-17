@@ -29,10 +29,10 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from .api import _store_file
-from .models import PPCDataRow, PPCUploadBatch
-from .parsers import PARSERS
-from .serializers import PPCUploadBatchSerializer
+from ppc_data.api.uploads import _store_file
+from ppc_data.models import PPCDataRow, PPCUploadBatch
+from ppc_data.parsers import PARSERS
+from ppc_data.serializers import PPCUploadBatchSerializer
 
 log = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ def mps_compute(request):
         # Default to current month
         month = timezone.now().strftime("%Y-%m")
 
-    from .compute_mps import compute_mps
+    from ppc_data.compute.mps import compute_mps
 
     try:
         result = compute_mps(month, user=request.user)
@@ -213,7 +213,7 @@ def mps_gate(request):
       2. MPS schedule has been computed
       3. W1+W2+W3+W4+W5 = NET_REQUIREMENT for every part (zero gate failures)
     """
-    from .field_maps.helpers import num0
+    from ppc_data.field_maps.helpers import num0
 
     month = request.GET.get("month", "").strip()
     if not month:
@@ -222,7 +222,7 @@ def mps_gate(request):
     checks = []
 
     # Check 1: demand frozen
-    from .models import PPCDemandFreeze
+    from ppc_data.models import PPCDemandFreeze
     demand_count = PPCDemandFreeze.objects.filter(month=month).count()
     checks.append({
         "check": "demand_frozen",
@@ -336,7 +336,7 @@ def mps_current(request):
 @api_view(["GET"])
 def mps_summary(request):
     """MPS summary — tile data for the hub screen."""
-    from .field_maps.helpers import num0
+    from ppc_data.field_maps.helpers import num0
 
     batch = (
         PPCUploadBatch.objects

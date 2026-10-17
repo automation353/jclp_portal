@@ -23,8 +23,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .field_maps.helpers import num0
-from .models import (
+from ppc_data.field_maps.helpers import num0
+from ppc_data.models import (
     PPCDataRow,
     PPCProductionEntry,
     PPCRejectionEntry,
@@ -549,7 +549,7 @@ def production_scorecard(request):
     sheet_sync_result = None
     if request.GET.get("sync_sheet") == "true":
         try:
-            from .sheet_sync import sync_scorecard_to_sheet
+            from ppc_data.compute.sheet_sync import sync_scorecard_to_sheet
             sheet_sync_result = sync_scorecard_to_sheet(release)
             log.info("Scorecard sheet sync: %s", sheet_sync_result)
         except Exception:

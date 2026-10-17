@@ -41,7 +41,7 @@ import requests
 log = logging.getLogger(__name__)
 
 # One JSON aggregate per register kind lives here.
-STATE_DIR = os.path.join(os.path.dirname(__file__), "mto_mts_state")
+STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mto_mts_state")
 
 # Register columns the aggregation needs (matched by header name, any position).
 _COL_ITEM_GROUP = "Item Group"
@@ -174,7 +174,7 @@ def _read_register(file_path):
     import warnings
 
     from openpyxl import load_workbook
-    from .sheet_sync import _SALES_REGISTER_COLUMNS
+    from ppc_data.compute.sheet_sync import _SALES_REGISTER_COLUMNS
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
