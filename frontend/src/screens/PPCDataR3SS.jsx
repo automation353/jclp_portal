@@ -60,13 +60,17 @@ const GROUPS = {
   plan:    { label: 'Plan' },
   weeks:   { label: 'Weeks' },
   output:  { label: 'Output' },
+  backlog: { label: 'Backlog' },
+  perf:    { label: 'Performance' },
+  counts:  { label: 'Colour Counts' },
   days:    { label: 'Days' },
 }
 
 /** Default group visibility — Engineering & Policy off by default (mostly zeros) */
 const DEFAULT_GROUPS = {
   class: true, engg: false, policy: false,
-  demand: true, stock: true, plan: true, weeks: true, output: true, days: true,
+  demand: true, stock: true, plan: true, weeks: true, output: true,
+  backlog: true, perf: true, counts: true, days: true,
 }
 
 /**
@@ -79,40 +83,45 @@ const COLS = [
   // Classification — matches R3SS file naming
   { key: 'jolly_code',     label: 'Jolly Code',      group: 'class' },
   { key: 'jolly_size',     label: 'Jolly Size',      group: 'class' },
+  { key: 'description',    label: 'Cust Part No',    group: 'class' },
   { key: 'family',         label: 'Family',          group: 'class' },
   { key: 'product_group',  label: 'Product Group',   group: 'class' },
   { key: 'section',        label: 'Section',         group: 'class' },
   { key: 'stamping',       label: 'Stamping',        group: 'class' },
   { key: 'atmc_group',     label: 'ATMC Group',      group: 'class' },
   { key: 'mto_mts',        label: 'MTO/MTS',         group: 'class' },
+  { key: 'mto_mts_indication', label: 'MTO/MTS Ind.', group: 'class' },
+  { key: 'moving_category',label: 'Category',        group: 'class' },
+  { key: 'trend',          label: 'Trend',           group: 'class' },
+  { key: 'mts_critical',   label: 'MTS Critical',    group: 'class', num: true },
   { key: 'category',       label: 'Customer',         group: 'class', last: true },
 
-  // Engineering
+  // Engineering — only columns the reference sheet has
   { key: 'teeth',          label: 'No of Teeth',     group: 'engg', num: true },
-  { key: 'strokes',        label: 'No of Strokes',   group: 'engg', num: true },
-  { key: 'open_dia',       label: 'Open Dia',        group: 'engg', num: true, dec: 2 },
-  { key: 'close_dia',      label: 'Close Dia',       group: 'engg', num: true, dec: 2 },
-  { key: 'cut_length',     label: 'Cut Length',      group: 'engg', num: true, dec: 2 },
-  { key: 'strip_weight',   label: 'Strip Weight',    group: 'engg', num: true, dec: 2, last: true },
+  { key: 'strokes',        label: 'No of Strokes',   group: 'engg', num: true, last: true },
 
   // Policy
   { key: 'green_level',    label: 'Green Level',     group: 'policy', num: true },
   { key: 'red_level',      label: 'Red Level',       group: 'policy', num: true },
   { key: 'blue_level',     label: 'Blue Level',      group: 'policy', num: true },
   { key: 'colour',         label: 'Colour',          group: 'policy' },
-  { key: 'asp',            label: 'ASP',             group: 'policy', num: true, dec: 2 },
-  { key: 'ebq',            label: 'EBQ',             group: 'policy', num: true },
-  { key: 'lead_time',      label: 'Lead Time',       group: 'policy', num: true, last: true },
+  { key: 'ffpl_gl',        label: 'FFPL GL',         group: 'policy', num: true },
+  { key: 'safety_stock',   label: 'Safety Stock',    group: 'policy', num: true },
+  { key: 'rm_kg',          label: 'RM Kg/1000',      group: 'policy', num: true, dec: 2 },
+  { key: 'asp',            label: 'ASP',             group: 'policy', num: true, dec: 2, last: true },
 
   // Demand Qty
   { key: 'initial_demand',      label: 'Initial',          group: 'demand', num: true, sum: true },
   { key: 'additional_demand',   label: 'Additional',       group: 'demand', num: true, sum: true },
   { key: 'total_demand',        label: 'Total',            group: 'demand', num: true, bold: true, sum: true },
-  { key: 'sales_order_pending', label: 'SO Pending',      group: 'demand', num: true, sum: true, last: true },
+  { key: 'demand_init_w1',      label: 'Demand (Init+W1)', group: 'demand', num: true, sum: true, last: true },
 
   // Stock
   { key: 'opening_balance',label: 'Opening Balance',  group: 'stock', num: true, sum: true },
   { key: 'fg_stock',       label: 'FG',                group: 'stock', num: true, sum: true },
+  { key: 'opening_stock',  label: 'Opening Stock',    group: 'stock', num: true, sum: true },
+  { key: 'fg_in',          label: 'In',               group: 'stock', num: true, sum: true },
+  { key: 'fg_out',         label: 'Out',              group: 'stock', num: true, sum: true },
   { key: 'pack',           label: 'Pack',             group: 'stock', num: true, sum: true },
   { key: 'disp',           label: 'Disp',             group: 'stock', num: true, sum: true, last: true },
 
@@ -128,11 +137,25 @@ const COLS = [
 
   // Plan output
   { key: 'total_plan',     label: 'Total Plan (HW+MIT)', group: 'output', num: true, sum: true },
-  { key: 'total_plan_hw',  label: 'Total Plan HW',     group: 'output', num: true, sum: true },
-  { key: 'total_plan_mit', label: 'Total Plan MIT',    group: 'output', num: true, sum: true },
   { key: 'cutting',        label: 'Cutting',          group: 'output', num: true, sum: true },
-  { key: 'difference',     label: 'Difference',       group: 'output', num: true, sum: true },
-  { key: 'backlog',        label: 'Backlog',          group: 'output', num: true, sum: true, last: true },
+  { key: 'difference',     label: 'Difference',       group: 'output', num: true, sum: true, last: true },
+
+  // Backlog (previous month)
+  { key: 'initial_demand_prev', label: 'Initial Demand (Prev)', group: 'backlog', num: true, sum: true },
+  { key: 'difference_prev',     label: 'Difference (Prev)',     group: 'backlog', num: true, sum: true, last: true },
+
+  // Performance
+  { key: 'short_production',     label: 'Short Production',       group: 'perf', num: true, sum: true },
+  { key: 'adherence_initial',    label: 'Adherence vs Initial',   group: 'perf', num: true, dec: 2 },
+  { key: 'adherence_initial_10', label: 'Adherence vs Init+10%',  group: 'perf', num: true, dec: 2 },
+  { key: 'pct_packing',          label: '% Packing Done',         group: 'perf', num: true, dec: 2 },
+  { key: 'packing_dpr',          label: 'Packing as per DPR',     group: 'perf', num: true, sum: true, last: true },
+
+  // Colour counts
+  { key: 'count_rl', label: 'Count RL', group: 'counts', num: true },
+  { key: 'count_yl', label: 'Count YL', group: 'counts', num: true },
+  { key: 'count_gl', label: 'Count GL', group: 'counts', num: true },
+  { key: 'count_bl', label: 'Count BL', group: 'counts', num: true, last: true },
 ]
 
 /* ─── Sheet constants ─────────────────────────────────────────── */
@@ -522,7 +545,6 @@ export default function PPCDataR3SS() {
               { label: 'Total Demand',value: totals.total_demand,  color: '#b05520' },
               { label: 'To Plan',     value: totals.to_plan,       color: 'var(--accent)' },
               { label: 'Total Plan (HW+MIT)', value: totals.total_plan, color: 'var(--ok)' },
-              { label: 'SO Pending',  value: totals.sales_order_pending, color: '#7c5c00' },
               { label: 'Difference',
                 value: totals.difference,
                 color: (totals.difference || 0) < 0 ? 'var(--bad)' : 'var(--ok)' },

@@ -83,6 +83,32 @@ _EXACT_MAP = {
     # "Red/Green/Blue Level" — map them so the dashboard shows the values.
     "rl": "red_level",
     "bl": "blue_level",
+    # --- Reference columns already written to the R3SS tab (now surfaced) ---
+    "initial demand previous month": "initial_demand_prev",
+    "difference (prev)": "difference_prev",
+    "short production": "short_production",
+    "adherence against initial": "adherence_initial",
+    "adherence against initial + 10% additional": "adherence_initial_10",
+    "rm kg/1000": "rm_kg",
+    "mto/mts part indication": "mto_mts_indication",
+    "ffpl gl": "ffpl_gl",
+    "opening stock": "opening_stock",
+    "in": "fg_in",
+    "out": "fg_out",
+    "safety stock": "safety_stock",
+    "count of rl": "count_rl",
+    "count of yl": "count_yl",
+    "count of gl": "count_gl",
+    "count of bl": "count_bl",
+    # "Customer" already maps to `category`; the sheet's separate moving-class
+    # "Category" column maps to its own field so both can show.
+    "category": "moving_category",
+    "trend": "trend",
+    "mts critical": "mts_critical",
+    # --- Phase 2: new computed columns (engine v10) ---
+    "demand (initial + week 1)": "demand_init_w1",
+    "% packing done": "pct_packing",
+    "packing as per dpr": "packing_dpr",
 }
 
 _DATE_RE = re.compile(r"(\d{1,2})\s*[-/]\s*(\d{1,2})")
