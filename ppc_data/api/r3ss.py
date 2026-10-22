@@ -423,11 +423,16 @@ def r3ss_recompute_sheet(request):
     """Recompute the R3SS tab in-sheet, then return the fresh rows.
 
     Flow: (1) rebuild the MTO_MTS / EBQ Calc tabs in Django from the cached
-    register aggregates, (2) trigger Apps Script computeR3SS — which rebuilds
-    the R3SS tab AND (via its computeMtoMts hook) patches the R3SS MTO/MTS
-    column from the fresh MTO_MTS tab — (3) re-read the tab.
+    register aggregates (still used by the standalone MTO/MTS module), (2)
+    trigger Apps Script computeR3SS to rebuild the R3SS tab, (3) re-read it.
 
-    MTO/MTS runs first so the Apps Script hook reads the freshly-written data.
+    TEMPORARY (PPC meeting, 19 Oct 2026): MTO/MTS on R3SS now comes from the
+    R3SS build itself (computePlan: green>0 => MTS), not the separate sales-
+    register engine — it wasn't giving the exact reference replica. On the Sheet
+    side the green-gate and the computeMtoMts->R3SS hook are removed; on the
+    portal side the MTO_MTS read-overlay is off (R3SS_MTO_MTS_OVERLAY unset).
+    Step (1) still refreshes the MTO_MTS tab for its own module, but it no longer
+    feeds R3SS. To revert, restore the Apps Script hook/gate and set the env flag.
     """
     from ppc_data.compute.r3ss_sheet_reader import read_r3ss_rows, trigger_recompute
 

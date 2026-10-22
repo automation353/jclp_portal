@@ -82,6 +82,8 @@ const COLS = [
   { key: 'family',         label: 'Family',          group: 'class' },
   { key: 'product_group',  label: 'Product Group',   group: 'class' },
   { key: 'section',        label: 'Section',         group: 'class' },
+  { key: 'stamping',       label: 'Stamping',        group: 'class' },
+  { key: 'atmc_group',     label: 'ATMC Group',      group: 'class' },
   { key: 'mto_mts',        label: 'MTO/MTS',         group: 'class' },
   { key: 'category',       label: 'Customer',         group: 'class', last: true },
 
@@ -115,7 +117,6 @@ const COLS = [
   { key: 'disp',           label: 'Disp',             group: 'stock', num: true, sum: true, last: true },
 
   // Plan
-  { key: 'level',          label: 'Level',            group: 'plan', num: true },
   { key: 'to_plan',        label: 'To Plan',          group: 'plan', num: true, accent: true, sum: true, last: true },
 
   // Weekly buckets

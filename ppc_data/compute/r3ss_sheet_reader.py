@@ -266,15 +266,20 @@ def read_r3ss_rows(tab_name="R3SS", timeout=30):
         sr += 1
         out_rows.append({"sr_no": sr, "data": data})
 
-    # Overlay the computed recent MTO/MTS status (from the MTO_MTS tab), matched
-    # by jolly code. Items with no recent sales show NA. If the MTO_MTS tab isn't
-    # present yet, leave whatever the R3SS tab already had.
-    live = _load_mto_mts_live()
-    if live:
-        for row in out_rows:
-            d = row["data"]
-            jolly = _jolly_key(d.get("jolly_code"))
-            d["mto_mts"] = live.get(jolly, "NA")
+    # MTO/MTS source — TEMPORARY (PPC meeting, 19 Oct 2026):
+    # Use the R3SS tab's OWN MTO/MTS value (computePlan rule:
+    # isExport ? "MTO" : green>0 ? "MTS" : "MTO"), which matches the reference at
+    # ~99.97%. The separate sales-register MTO_MTS engine was NOT producing the
+    # exact replica we want, so for now R3SS drives MTO/MTS entirely on its own.
+    # The overlay below is kept (behind a flag) so it can be switched back on
+    # later without code changes: set env R3SS_MTO_MTS_OVERLAY=1.
+    if os.environ.get("R3SS_MTO_MTS_OVERLAY", "").strip() in ("1", "true", "True", "yes"):
+        live = _load_mto_mts_live()
+        if live:
+            for row in out_rows:
+                d = row["data"]
+                jolly = _jolly_key(d.get("jolly_code"))
+                d["mto_mts"] = live.get(jolly, "NA")
 
     return {"rows": out_rows, "row_count": len(out_rows), "plan_month": plan_month}
 
