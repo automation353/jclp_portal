@@ -268,7 +268,7 @@ function DqView({ dq }) {
       <Tile label="Blank descriptions" value={dq.blank_desc_count} kind={dq.blank_desc_count ? 'warn' : 'score'} />
     </div>
     {clean ? <p className="sub" style={{ marginTop: 14, fontSize: 13 }}>✓ Every item code maps to exactly one description — R19 is clean.</p> : (
-      <div style={{ overflowX: 'auto', marginTop: 12 }}>
+      <div style={{ overflowX: 'auto', maxWidth: '100%', minWidth: 0, marginTop: 12 }}>
         <table className="mto-table" style={{ minWidth: 560 }}>
           <thead><tr><th>Item Code</th><th>Issue</th><th>Descriptions</th></tr></thead>
           <tbody>
@@ -355,7 +355,7 @@ function RuleDash({ ruleId, onBack }) {
         <div className="dash-tile-grid">{kpis.map((t, i) => <Tile key={i} {...t} />)}</div>
         {calcCfg && <p className="sub" style={{ fontSize: 12.5, marginTop: 10 }}>💡 Click a code to see how its value was calculated and from which data.</p>}
         <Filters s={q} set={setQ} ph="Search" note={`${shown.length} of ${rows.length} rows · ${srcLabel}`} />
-        <div style={{ overflowX: 'auto', marginTop: 10 }}>
+        <div style={{ overflowX: 'auto', maxWidth: '100%', minWidth: 0, marginTop: 10 }}>
           <table className="mto-table" style={{ width: '100%' }}>
             <thead><tr>{cols.map(c => <th key={c} className={NUMCOL.test(c) ? 'num' : undefined}>{c}</th>)}</tr></thead>
             <tbody>
@@ -397,6 +397,9 @@ export default function PPCRMSourcing() {
   const [drill, setDrill] = useState(null)
   const [dq, setDq] = useState(null)          // R19 data-quality check
   const [cpFilter, setCpFilter] = useState('all')   // R27 All / Components / Packing
+  const [rmGrade, setRmGrade] = useState('all')     // RM grade segregation (SS 304/201/…)
+  const [rmSrc, setRmSrc] = useState('all')         // RM source: direct in FG vs via CP
+  const [cpGrade, setCpGrade] = useState('all')     // CP grade segregation
   const [ruleView, setRuleView] = useState(null)    // open per-rule dashboard
 
   async function load() {
@@ -454,17 +457,65 @@ export default function PPCRMSourcing() {
     reqd: (r['Reqd Qty'] || '').toString().trim(),
     nosCorr: (r['Qty in nos (Correction)'] || '').toString().trim(),
     type: cpType(r['Item Code'], r['Description']),
+    grade: grade(r['Description']),
   })), [cp])
+  // Global CP → the RMs it consumes (aggregated across every FG's recipe), so
+  // the CP Req tab can show each CP's RMs inline — same "RM in the CP" view as
+  // By Product, but for the whole CP requirement.
+  const cpRmGlobal = useMemo(() => {
+    const m = {}
+    fgs.forEach(fg => (fg.cp_rm_parts || []).forEach(c => {
+      const e = m[c.cp] || (m[c.cp] = {})
+      ;(c.rms || []).forEach(rr => {
+        const x = e[rr.code] || (e[rr.code] = { code: rr.code, desc: rr.desc, uom: rr.uom, req: 0 })
+        x.req += N(rr.req)
+      })
+    }))
+    const out = {}
+    Object.keys(m).forEach(cp => { out[cp] = Object.values(m[cp]).sort((a, b) => b.req - a.req) })
+    return out
+  }, [fgs])
+  // Classify each RM by source: "direct" = used straight in an FG; "via" = reached
+  // through a CP (Rule 21). An RM can be both. Derived from the By Product data.
+  const rmSource = useMemo(() => {
+    const direct = new Set(), via = new Set()
+    fgs.forEach(fg => {
+      ;(fg.parts || []).forEach(p => { if (p.rm) direct.add((p.code || '').toUpperCase()) })
+      ;(fg.rm_via_cp_parts || []).forEach(p => via.add((p.code || '').toUpperCase()))
+      ;(fg.cp_rm_parts || []).forEach(c => (c.rms || []).forEach(rr => via.add((rr.code || '').toUpperCase())))
+    })
+    return { direct, via }
+  }, [fgs])
 
   const s = search.toLowerCase()
   const fgF = fgs.filter(r => !s || [r.bom_code, r.family, r.customer, r.erp_code].some(x => (x || '').toLowerCase().includes(s)))
     .sort((a, b) => N(b.rm_total ?? b.rm_demand) - N(a.rm_total ?? a.rm_demand))
   const rmF = rmView.filter(r => !s || r.code.toLowerCase().includes(s) || (r.desc || '').toLowerCase().includes(s))
+    .filter(r => rmGrade === 'all' || r.grade === rmGrade)
+    .filter(r => rmSrc === 'all' || (rmSrc === 'direct' ? rmSource.direct.has((r.code || '').toUpperCase()) : rmSource.via.has((r.code || '').toUpperCase())))
     .sort((a, b) => b.qty - a.qty)
   const cpF = cpView
     .filter(r => cpFilter === 'all' || (cpFilter === 'pack' ? r.type === 'Packing' : r.type !== 'Packing'))
+    .filter(r => cpGrade === 'all' || r.grade === cpGrade)
     .filter(r => !s || r.code.toLowerCase().includes(s) || (r.desc || '').toLowerCase().includes(s))
     .sort((a, b) => b.req - a.req)
+  // Grade buckets present in the data (All + each grade), ordered.
+  const GRADE_ORDER = ['SS 304', 'SS 316', 'SS 201', 'SS 202', 'SS 430', 'SS 409', 'Other']
+  const gradesIn = rows => GRADE_ORDER.filter(g => rows.some(r => r.grade === g))
+  const rmGrades = gradesIn(rmView)
+  const cpGrades = gradesIn(cpView)
+  const Pills = ({ opts, val, set, label }) => (
+    <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      {label && <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginRight: 2 }}>{label}</span>}
+      {opts.map(([k, lbl]) => (
+        <button key={k} onClick={() => set(k)} style={{
+          padding: '4px 12px', borderRadius: 16, border: '1px solid #cbd5e1', cursor: 'pointer',
+          fontSize: 12.5, fontWeight: 600,
+          background: val === k ? 'var(--accent)' : '#fff', color: val === k ? '#fff' : 'var(--muted)',
+        }}>{lbl}</button>
+      ))}
+    </div>
+  )
 
   // Rules tab — live metrics proving each applied rule, + the tab it drills to.
   const cpLines = fgs.reduce((a, b) => a + (b.parts ? b.parts.length : 0), 0)
@@ -483,7 +534,7 @@ export default function PPCRMSourcing() {
   return (
     <section className="screen">
       <TopBar subtitle="PPC Department" />
-      <div className="wrap">
+      <div className="wrap wrap-wide" style={{ minWidth: 0 }}>
         <div className="crumbs"><Link to="/departments">Home</Link> › <Link to="/ppc-data">PPC Data</Link> › RM Sourcing</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <div>
@@ -523,7 +574,7 @@ export default function PPCRMSourcing() {
                 <Tile label="CP / Packing Items" value={cp.length} kind="score" />
               </div>
               <Filters s={search} set={setSearch} ph="Search BOM code / family / customer" note={`${fgF.length} products`} />
-              <div style={{ overflowX: 'auto', marginTop: 10 }}>
+              <div style={{ overflowX: 'auto', maxWidth: '100%', minWidth: 0, marginTop: 10 }}>
                 <table className="mto-table" style={{ width: '100%' }}>
                   <thead><tr><th></th><th>BOM Code</th><th>Family</th><th>Customer</th><th className="num">Planned FG Qty</th><th className="num">RM Total (Kg)</th><th className="num">CP Demand (Nos)</th><th className="num">BOM Parts</th></tr></thead>
                   <tbody>
@@ -533,6 +584,9 @@ export default function PPCRMSourcing() {
                         const parts = r.parts || r.rms || []
                         const nRm = r.rm_count ?? parts.filter(p => p.rm).length
                         const nCp = r.cp_count ?? parts.filter(p => !p.rm).length
+                        // CP code → the RMs it consumes (for the inline per-CP dropdown).
+                        const cpRmByCode = {}
+                        ;(r.cp_rm_parts || []).forEach(c => { cpRmByCode[c.cp] = c })
                         return [
                           <tr key={r.bom_code} style={{ cursor: 'pointer' }} onClick={() => toggle(r.bom_code)}>
                             <td style={{ width: 24, textAlign: 'center', color: 'var(--muted)' }}>{o ? '▾' : '▸'}</td>
@@ -556,8 +610,13 @@ export default function PPCRMSourcing() {
                               </div>
                             </div>
                             <table style={{ width: '100%', fontSize: 13 }}><tbody>
-                              {parts.map((m, j) => <tr key={j}>
-                                <td style={{ fontFamily: 'monospace', fontSize: 12, padding: '2px 8px', whiteSpace: 'nowrap' }}>{m.code}</td>
+                              {parts.flatMap((m, j) => {
+                                const cpInfo = m.rm ? null : cpRmByCode[m.code]
+                                const hasRms = !!(cpInfo && cpInfo.rms && cpInfo.rms.length)
+                                const cpKey = r.bom_code + '|cpx|' + m.code
+                                const cpOpen = hasRms && calcOpen.has(cpKey)
+                                const main = (<tr key={j} onClick={hasRms ? () => toggleCalc(cpKey) : undefined} style={{ cursor: hasRms ? 'pointer' : 'default' }}>
+                                <td style={{ fontFamily: 'monospace', fontSize: 12, padding: '2px 8px', whiteSpace: 'nowrap' }}>{hasRms && <span style={{ color: '#6a1b9a', marginRight: 4 }}>{cpOpen ? '▾' : '▸'}</span>}{m.code}</td>
                                 <td style={{ padding: '2px 8px', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{(m.desc || '').replace(/ /g, ' ')}</td>
                                 <td style={{ padding: '2px 8px', whiteSpace: 'nowrap' }}>
                                   <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
@@ -570,7 +629,16 @@ export default function PPCRMSourcing() {
                                   <div style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{dec(m.req)} {m.uom}</div>
                                   {m.bq != null && <div style={{ color: 'var(--muted)', fontSize: 10, whiteSpace: 'nowrap' }}>{fmt(r.planned)} × {dec(m.bq)} ÷ 1000</div>}
                                 </td>
-                              </tr>)}
+                              </tr>)
+                                if (!cpOpen) return [main]
+                                const subs = cpInfo.rms.map((rr, k) => (<tr key={j + '_rm' + k} style={{ background: '#faf7fc' }}>
+                                  <td style={{ padding: '2px 8px 2px 26px', fontFamily: 'monospace', fontSize: 11.5, whiteSpace: 'nowrap', color: '#1565c0' }}>↳ {rr.code}</td>
+                                  <td style={{ padding: '2px 8px', fontSize: 12, overflowWrap: 'anywhere', color: '#455a64' }}>{rr.desc}</td>
+                                  <td style={{ padding: '2px 8px' }}><span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#e3f2fd', color: '#1565c0' }}>RM</span></td>
+                                  <td style={{ textAlign: 'right', padding: '2px 8px', whiteSpace: 'nowrap', color: '#1565c0', fontWeight: 600 }}>{dec(rr.req)} {rr.uom}</td>
+                                </tr>))
+                                return [main, ...subs]
+                              })}
                               {/* R21 — multi-level roll-up: RM direct + RM via CP = RM total */}
                               <tr style={{ borderTop: '2px solid #cbd5e0' }}>
                                 <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', color: '#1565c0' }}>RM used directly in FG →</td>
@@ -597,7 +665,7 @@ export default function PPCRMSourcing() {
                                 <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#0a5fa5', whiteSpace: 'nowrap' }}>{fmt(r.rm_total ?? r.rm_demand)} Kg</td>
                               </tr>
                               {/* CP Req — click to see which RM each CP consumes */}
-                              {(() => { const cK = r.bom_code + '|cp', co = calcOpen.has(cK), hasCp = r.cp_rm_parts && r.cp_rm_parts.length > 0; return [
+                              {(() => { const cK = r.bom_code + '|cp', co = false, hasCp = false; /* per-CP RM detail now shown inline on each CP row above */ return [
                                 <tr key="cpreq" onClick={hasCp ? () => toggleCalc(cK) : undefined} style={{ cursor: hasCp ? 'pointer' : 'default' }}>
                                   <td colSpan={3} style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 700, color: '#6a1b9a' }}>{hasCp && <span style={{ marginRight: 4 }}>{co ? '▾' : '▸'}</span>}CP Req total →</td>
                                   <td style={{ textAlign: 'right', padding: '4px 8px', fontWeight: 700, color: '#6a1b9a', whiteSpace: 'nowrap' }}>
@@ -627,8 +695,10 @@ export default function PPCRMSourcing() {
                 <Tile label="RM Items" value={rmF.length} kind="score" />
                 <Tile label="Reqd Qty set (PPC)" value={rmF.filter(r => r.reqd).length} sub="manual final entered" kind="warn" />
               </div>
+              <Pills opts={[['all', 'All'], ['direct', 'Direct RM (in FG)'], ['via', 'RM via CP']]} val={rmSrc} set={setRmSrc} label="Source:" />
+              <Pills opts={[['all', 'All'], ...rmGrades.map(g => [g, g])]} val={rmGrade} set={setRmGrade} label="Grade:" />
               <Filters s={search} set={setSearch} ph="Search RM code / description" note={`${rmF.length} raw materials`} />
-              <div style={{ overflowX: 'auto', marginTop: 10 }}>
+              <div style={{ overflowX: 'auto', maxWidth: '100%', minWidth: 0, marginTop: 10 }}>
                 <table className="mto-table" style={{ width: '100%' }}>
                   <thead><tr><th>Item Code</th><th>Description</th><th className="num">Qty</th><th className="num">Reqd Qty</th><th>Source</th><th></th></tr></thead>
                   <tbody>
@@ -656,30 +726,39 @@ export default function PPCRMSourcing() {
                 <Tile label="Packing Items" value={cpView.filter(r => r.type === 'Packing').length} kind="score" sub="R27 — plan as annual job" />
                 <Tile label="Total Requirement" value={fmt(cpView.reduce((a, r) => a + r.req, 0))} kind="warn" sub="mixed UOM (Kgs / Nos)" />
               </div>
-              {/* R27 — view packaging separately from components */}
-              <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-                {[['all', 'All'], ['comp', 'Components'], ['pack', 'Packing (annual)']].map(([k, label]) => (
-                  <button key={k} onClick={() => setCpFilter(k)} style={{
-                    padding: '4px 12px', borderRadius: 16, border: '1px solid #cbd5e1', cursor: 'pointer',
-                    fontSize: 12.5, fontWeight: 600,
-                    background: cpFilter === k ? 'var(--accent)' : '#fff', color: cpFilter === k ? '#fff' : 'var(--muted)',
-                  }}>{label}</button>
-                ))}
-              </div>
+              {/* R27 — segregate by type, and by material grade */}
+              <Pills opts={[['all', 'All'], ['comp', 'Components'], ['pack', 'Packing (annual)']]} val={cpFilter} set={setCpFilter} label="Type:" />
+              <Pills opts={[['all', 'All'], ...cpGrades.map(g => [g, g])]} val={cpGrade} set={setCpGrade} label="Grade:" />
               <Filters s={search} set={setSearch} ph="Search item code / description" note={`${cpF.length} shown`} />
-              <div style={{ overflowX: 'auto', marginTop: 10 }}>
+              <div style={{ overflowX: 'auto', maxWidth: '100%', minWidth: 0, marginTop: 10 }}>
                 <table className="mto-table" style={{ width: '100%' }}>
                   <thead><tr><th>Item Code</th><th>Description</th><th>Type</th><th className="num">Requirement</th><th>UOM</th><th></th></tr></thead>
                   <tbody>
                     {cpF.length === 0 ? <tr><td colSpan={6}>No CP/packing requirement yet.</td></tr> :
-                      cpF.map((r, i) => <tr key={i}>
-                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.code}</td>
-                        <td className="desc-wrap">{(r.desc || '').replace(/ /g, ' ')}</td>
-                        <td><span className={r.type === 'Packing' ? 'r3ss-mts' : 'r3ss-na'}>{r.type}</span></td>
+                      cpF.flatMap((r, i) => {
+                        const rms = r.type === 'Packing' ? null : cpRmGlobal[r.code]
+                        const hasRms = !!(rms && rms.length)
+                        const key = 'cpreq|' + r.code
+                        const o = hasRms && calcOpen.has(key)
+                        const main = (<tr key={i} onClick={hasRms ? () => toggleCalc(key) : undefined} style={{ cursor: hasRms ? 'pointer' : 'default' }}>
+                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{hasRms && <span style={{ color: '#6a1b9a', marginRight: 4 }}>{o ? '▾' : '▸'}</span>}{r.code}</td>
+                        <td className="desc-wrap">{(r.desc || '').replace(/\u00a0/g, ' ')}</td>
+                        <td><span className={r.type === 'Packing' ? 'r3ss-mts' : 'r3ss-na'}>{r.type}</span>{hasRms && <span style={{ color: 'var(--muted)', fontSize: 10, marginLeft: 6 }}>{rms.length} RM ▾</span>}</td>
                         <td className="num" style={{ fontWeight: 700 }}>{dec(r.req)}</td>
                         <td>{r.uom}</td>
-                        <td><button className="backbtn" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => openDrill(r.code)}>Where used</button></td>
-                      </tr>)}
+                        <td><button className="backbtn" style={{ padding: '2px 8px', fontSize: 12 }} onClick={(e) => { e.stopPropagation(); openDrill(r.code) }}>Where used</button></td>
+                        </tr>)
+                        if (!o) return [main]
+                        const subs = rms.map((rr, k) => (<tr key={i + '_r' + k} style={{ background: '#faf7fc' }}>
+                          <td style={{ paddingLeft: 26, fontFamily: 'monospace', fontSize: 11.5, color: '#1565c0' }}>↳ {rr.code}</td>
+                          <td className="desc-wrap" style={{ color: '#455a64' }}>{(rr.desc || '').replace(/\u00a0/g, ' ')}</td>
+                          <td><span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: '#e3f2fd', color: '#1565c0' }}>RM</span></td>
+                          <td className="num" style={{ color: '#1565c0', fontWeight: 600 }}>{dec(rr.req)}</td>
+                          <td>{rr.uom}</td>
+                          <td></td>
+                        </tr>))
+                        return [main, ...subs]
+                      })}
                   </tbody>
                 </table>
               </div>
