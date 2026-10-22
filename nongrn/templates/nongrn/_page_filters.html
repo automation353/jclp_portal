@@ -1,0 +1,18 @@
+<div class="page-filters">
+  {% for f in filters %}
+  <div class="page-filter dropdown">
+    <span class="pf-label">{{ f.label }}</span>
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+      {% if f.chosen %}{% if f.chosen|length == 1 %}{{ f.chosen.0 }}{% else %}(Multiple Items){% endif %}{% else %}(All){% endif %}
+    </button>
+    <div class="dropdown-menu p-2 pf-menu">
+      {% for o in f.options %}
+        <label class="form-check d-block"><input class="form-check-input" type="checkbox" name="{{ f.param }}" value="{{ o }}" {% if o in f.chosen %}checked{% endif %}> {{ o }}</label>
+      {% endfor %}
+      <div class="d-flex gap-2 mt-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-clear="{{ f.param }}">(All)</button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>

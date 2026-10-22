@@ -14,6 +14,10 @@ uploads/
 ppc_data/mto_mts_state/
 ppc_data/rm_sourcing_state/
 
+# Non GRN module runtime state + its source data folders (server-only, large)
+nongrn_state/
+Non GRN Project/
+
 # Large reference / input workbooks (not source)
 MTO_MTS Details V3 (Logic change).xlsx
 RM CP Packing Mtl Planning.xlsx
@@ -21,3 +25,7 @@ JCPL-RMCP-Process-Steps*.docx
 
 # S&OP reference workbook (not source)
 Sales+Ops Dashboard.xlsm
+
+# R3SS reference workbook + generated review docs (not source)
+R3 SS.xlsx
+R3SS Dashboard vs Reference *.docx

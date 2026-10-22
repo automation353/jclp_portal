@@ -14,12 +14,20 @@ const SALES_PORTALS = [
     slug: 'oem-forecast', name: 'OEM Forecast', icon: '📈',
     description: 'Rolling customer-order forecast.', status: 'soon',
   },
+  {
+    slug: 'non-grn', name: 'Non GRN', icon: '🧾',
+    description: 'Non-GRN ageing — Report, Customer Dashboard & Manual GRN.',
+    status: 'live', external: '/nongrn/',
+  },
 ]
 
 export default function OEMSales() {
   const navigate = useNavigate()
 
   function open(portal) {
+    // Server-rendered Django modules (e.g. Non GRN) live outside the SPA, so
+    // navigate with a full page load rather than the React router.
+    if (portal.external) { window.location.href = portal.external; return }
     if (portal.status === 'live') navigate(`/${portal.slug}`)
     else window.alert(`“${portal.name}” — coming soon.\nThis module isn't built yet.`)
   }

@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'ppc_data',
     'po_data',
     'sop',
+    'nongrn',
 ]
 
 # Email — reads SMTP creds from the shared /root/.env. Falls back to the
@@ -113,6 +114,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'dashboard.context_processors.sidebar_modules',
+                # Non GRN module — self-scoped: returns only {asset_version} for
+                # every non-nongrn page, so it never touches other modules.
+                'nongrn.context.portal',
             ],
         },
     },
@@ -178,3 +182,30 @@ LOGIN_REDIRECT_URL = 'dashboard:home'
 LOGOUT_REDIRECT_URL = 'login'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# ---------------------------------------------------------------------------
+# Non GRN Age module (nongrn app) — server-rendered pages under /nongrn/.
+# Self-contained: these keys are read only by the nongrn app. Paths default to
+# the uploaded "Non GRN Project" data folders; override any via /root/.env.
+# ---------------------------------------------------------------------------
+_NONGRN_PROJECT_DIR = Path(
+    os.environ.get('NONGRN_PROJECT_DIR', str(BASE_DIR / 'Non GRN Project')))
+
+NONGRN_SOURCES = {
+    'sr_current': Path(os.environ.get('NONGRN_SR_CURRENT', str(_NONGRN_PROJECT_DIR / 'Non GRN'))),
+    'sr_prev':    Path(os.environ.get('NONGRN_SR_PREV',    str(_NONGRN_PROJECT_DIR / 'Non GRN CF 25-26'))),
+    'mda_current':Path(os.environ.get('NONGRN_MDA_CURRENT',str(_NONGRN_PROJECT_DIR / 'MDA'))),
+    'mda_prev':   Path(os.environ.get('NONGRN_MDA_PREV',   str(_NONGRN_PROJECT_DIR / 'MDA FY 25-26'))),
+}
+NONGRN_FY_START_YEAR = int(os.environ.get('NONGRN_FY_START_YEAR', '2026'))   # 2026 -> FY 26-27
+NONGRN_DATA_DIR = Path(os.environ.get('NONGRN_DATA_DIR', str(BASE_DIR / 'nongrn_state')))
+NONGRN_ARCHIVE_DIR = Path(os.environ.get('NONGRN_ARCHIVE_DIR', str(BASE_DIR / 'nongrn_state' / 'archive')))
+NONGRN_TEMPLATE = Path(os.environ.get(
+    'NONGRN_TEMPLATE', str(_NONGRN_PROJECT_DIR / 'Non GRN Age.xlsx')))
+NONGRN_REQUIRE_LOGIN = os.environ.get('NONGRN_REQUIRE_LOGIN', '1') == '1'
+
+# n8n webhook that mirrors uploaded source files to Google Sheets (blank = off)
+NONGRN_N8N_WEBHOOK_URL = os.environ.get('NONGRN_N8N_WEBHOOK_URL', '')
+NONGRN_N8N_TOKEN = os.environ.get('NONGRN_N8N_TOKEN', '')
+NONGRN_N8N_TIMEOUT = int(os.environ.get('NONGRN_N8N_TIMEOUT', '900'))

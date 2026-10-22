@@ -1,0 +1,73 @@
+{% extends "nongrn/base.html" %}
+{% load static %}
+{% block title %}Manual GRN{% endblock %}
+{% block page_title %}Manual GRN<small>editable sheet</small>{% endblock %}
+{% block content %}
+<div class="sheet-page">
+  <div class="sheet-head d-flex flex-wrap align-items-center gap-2">
+    <h1 class="me-auto">Manual GRN<small>GRN dates you enter here are used when the ERP has no Goods Received Date (Combine!HZ). Save to recalculate every sheet.</small></h1>
+    <span id="dirty" class="badge text-bg-warning d-none">Unsaved changes</span>
+    <button class="btn btn-sm btn-outline-primary" id="add-row"><i class="bi bi-plus-lg"></i> Add row</button>
+    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#paste-modal"><i class="bi bi-clipboard"></i> Paste from Excel</button>
+    <label class="btn btn-sm btn-outline-primary mb-0"><i class="bi bi-upload"></i> Import file
+      <input type="file" id="import-file" accept=".xlsx,.xls,.csv" hidden></label>
+    <a class="btn btn-sm btn-outline-success" href="{% url 'nongrn:export' 'manual-grn' 'xlsx' %}"><i class="bi bi-file-earmark-excel"></i> Export</a>
+    <button class="btn btn-sm btn-outline-secondary" id="discard"><i class="bi bi-arrow-counterclockwise"></i> Discard</button>
+    <button class="btn btn-sm btn-brand" id="save"><i class="bi bi-check2-circle"></i> Save &amp; recalculate</button>
+  </div>
+  <div id="errors" class="alert alert-danger d-none py-2"></div>
+
+  <div class="row g-3">
+    <div class="col-xl-8">
+      <section class="xl-card p-0">
+        <div class="table-responsive manual-wrap">
+          <table class="xl-table manual" id="manual">
+            <thead>
+              <tr class="letters"><th class="rn"></th><th>A</th><th>B</th><th colspan="6" class="ctx-h">Looked up from Combine (read-only)</th><th></th></tr>
+              <tr><th class="rn">1</th><th class="edit-h">Invoice Number</th><th class="edit-h">GRN Date</th>
+                <th>Customer</th><th>Inv Date</th><th class="text-end">Invoice ₹</th><th>ERP GRN</th><th>GRN Source now</th><th class="text-end">Current Non-GRN ₹</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="foot px-3 pb-2">
+          Rules from the workbook: the ERP <b>Goods Received Date</b> always wins; Manual GRN is used only when it is blank
+          (then GRN Source becomes <b>2. Manual GRN</b>). Non-GRN period ends the day before the GRN date.
+        </div>
+      </section>
+    </div>
+    <div class="col-xl-4">
+      <section class="xl-card">
+        <h2>Open invoices still without GRN</h2>
+        <input type="search" id="cand-q" class="form-control form-control-sm mb-2" placeholder="Search invoice or customer…">
+        <div class="cand-list" id="cand-list"><div class="text-muted small">Loading…</div></div>
+        <div class="foot">GRN Source "4. Not Received" / "3. Assumed Inv+30" with a current Non-GRN balance, oldest first. Click + to add.</div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="paste-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Paste from Excel</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <p class="small text-muted mb-2">Copy two columns (Invoice Number, GRN Date) in Excel and paste here. Dates like 12-10-2026, 12/10/2026 or 2026-10-12 work.</p>
+      <textarea id="paste-text" class="form-control font-monospace" rows="10"></textarea>
+      <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="paste-replace"><label class="form-check-label" for="paste-replace">Replace existing rows (otherwise append / update)</label></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" id="paste-apply" data-bs-dismiss="modal">Apply</button></div>
+  </div></div>
+</div>
+{{ rows_json|json_script:"manual-rows" }}
+{% endblock %}
+{% block scripts %}
+<script>
+  window.MANUAL = {
+    api: "{% url 'nongrn:manual_grn_api' %}",
+    lookup: "{% url 'nongrn:manual_grn_lookup' %}",
+    importUrl: "{% url 'nongrn:manual_grn_import' %}",
+    rows: JSON.parse(JSON.parse(document.getElementById('manual-rows').textContent)),
+  };
+</script>
+<script src="{% static 'nongrn/manual.js' %}?v={{ asset_version }}"></script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "nongrn/base.html" %}
+{% block title %}{{ sheet.title }}{% endblock %}
+{% block body_class %}grid-mode{% endblock %}
+{% block page_title %}{{ sheet.title }}<small>{% if sheet.key == "combine" %}Power Query table + 51 formula columns{% else %}Power Query output{% endif %}</small>{% endblock %}
+{% block content %}
+<div class="grid-page">
+  <div class="grid-toolbar">
+    <h1 class="m-0">{{ sheet.title }}
+      {% if sheet.hidden %}<span class="badge text-bg-secondary fw-normal">hidden in workbook</span>{% endif %}
+    </h1>
+    <div class="input-group input-group-sm search-box">
+      <span class="input-group-text"><i class="bi bi-search"></i></span>
+      <input type="search" id="q" class="form-control" placeholder="Search all columns…">
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" id="clear-filters" title="Clear all filters"><i class="bi bi-funnel"></i> Clear</button>
+    {% if sheet.key == "combine" %}
+    <div class="btn-group btn-group-sm preset-group" role="group" aria-label="Column view">
+      <button class="btn btn-outline-secondary" data-preset="key">Key columns</button>
+      <button class="btn btn-outline-secondary" data-preset="formula">Formula columns</button>
+      <button class="btn btn-outline-secondary" data-preset="all">All columns</button>
+    </div>
+    {% endif %}
+    <select id="jump" class="form-select form-select-sm jump" title="Jump to column">
+      <option value="">Go to column…</option>
+      {% for c in columns %}<option value="{{ forloop.counter0 }}">{{ c.letter }} · {{ c.name }}</option>{% endfor %}
+    </select>
+    <div class="ms-auto d-flex gap-1">
+      <a class="btn btn-sm btn-outline-success" href="{% url 'nongrn:export' sheet.key 'xlsx' %}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'nongrn:export' sheet.key 'csv' %}"><i class="bi bi-filetype-csv"></i> CSV</a>
+    </div>
+  </div>
+
+  <div class="formula-bar">
+    <span class="fb-ref" id="fb-ref">A1</span>
+    <span class="fb-fx">ƒx</span>
+    <span class="fb-text" id="fb-text"></span>
+  </div>
+
+  <div class="grid-scroll" id="grid-scroll">
+    <table class="grid" id="grid"></table>
+  </div>
+
+  <div class="grid-footer">
+    <span id="status" class="text-muted small">Loading…</span>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <select id="size" class="form-select form-select-sm w-auto">
+        <option>50</option><option selected>100</option><option>250</option><option>500</option>
+      </select>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-outline-secondary" id="first"><i class="bi bi-chevron-double-left"></i></button>
+        <button class="btn btn-outline-secondary" id="prev"><i class="bi bi-chevron-left"></i></button>
+        <span class="btn btn-outline-secondary disabled" id="pageinfo">1</span>
+        <button class="btn btn-outline-secondary" id="next"><i class="bi bi-chevron-right"></i></button>
+        <button class="btn btn-outline-secondary" id="last"><i class="bi bi-chevron-double-right"></i></button>
+      </div>
+    </div>
+  </div>
+  <div class="grid-hint">Filters: type text to match, or <code>&gt;0</code>, <code>&lt;=30</code>, <code>=5</code>, <code>(blank)</code>, <code>(nonblank)</code>. Click a header to sort. Green headers are formula columns (click a cell to see its formula).</div>
+</div>
+{{ columns|json_script:"grid-columns" }}
+{% endblock %}
+{% block scripts %}
+<script>
+  window.GRID = { url: "{% url 'nongrn:grid_data' sheet.key %}", key: "{{ sheet.key }}",
+                  columns: JSON.parse(document.getElementById('grid-columns').textContent) };
+</script>
+{% load static %}<script src="{% static 'nongrn/grid.js' %}?v={{ asset_version }}"></script>
+{% endblock %}

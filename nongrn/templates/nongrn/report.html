@@ -1,0 +1,304 @@
+{% extends "nongrn/base.html" %}
+{% load nongrn_fmt %}
+{% block title %}Report{% endblock %}
+{% block page_title %}Report<small>Non-GRN ageing overview</small>{% endblock %}
+{% block content %}
+{% with t=r.tiles %}
+<div class="sheet-page">
+  <div class="sheet-head">
+    <h1>Non-GRN overview<small>Position as on {{ r.as_on|date:"d M Y" }} · amounts in ₹ Lakhs unless stated · {{ t.lines|inr }} open lines across {{ t.customers }} customers</small></h1>
+  </div>
+
+  <!-- KPI tiles -->
+  <div class="tiles">
+    <div class="tile hero tone-total">
+      <div class="tile-label">Total Non-GRN outstanding</div>
+      <div class="tile-value">₹ {{ t.total|lakh }}<small>Lakhs</small></div>
+      <div class="tile-sub">
+        {% if t.delta is not None %}
+          <span class="delta {% if t.delta > 0 %}up-bad{% else %}down-good{% endif %}">
+            {% if t.delta > 0 %}▲ +{% else %}▼ {% endif %}{{ t.delta|lakh }} ({{ t.delta_pct|pct }})</span>
+          vs {{ t.prev_me|date:"d M" }} ({{ t.opening|lakh }})
+        {% endif %}
+      </div>
+    </div>
+    {% for k in t.above %}
+    <div class="tile tone-a{{ forloop.counter }}">
+      <div class="tile-label">Above {{ k.label|cut:"Above"|cut:"days"|cut:" " }} days</div>
+      <div class="tile-value">{{ k.lakh|lakh }}<small>L</small></div>
+      <div class="tile-sub">{{ k.pct|pct }} of total · {{ k.count }} lines</div>
+      <div class="meter"><span style="width: {{ k.pct|pct:2|cut:'%' }}%"></span></div>
+    </div>
+    {% endfor %}
+    <div class="tile tone-days">
+      <div class="tile-label">Non-GRN days</div>
+      <div class="tile-value">{{ t.nongrn_days|num1 }}<small>days</small></div>
+      <div class="tile-sub">vs avg daily billing (90 d)</div>
+    </div>
+    <div class="tile tone-fytd">
+      <div class="tile-label">% of FYTD billing</div>
+      <div class="tile-value">{{ t.pct_fytd|pct }}</div>
+      <div class="tile-sub">of ₹ {{ t.fytd|lakh }} L · {{ t.avg_days|num1 }} d to GRN</div>
+    </div>
+  </div>
+
+  <!-- P13:Y69 -->
+  <div class="section-title">Summary tables</div>
+  <section class="xl-card">
+    <ul class="nav nav-pills mb-3 gap-1 small" role="tablist">
+      <li class="nav-item"><button class="nav-link active py-1" data-bs-toggle="pill" data-bs-target="#t-a">Summary (₹ L)</button></li>
+      <li class="nav-item"><button class="nav-link py-1" data-bs-toggle="pill" data-bs-target="#t-b">Above-60 view (₹ L)</button></li>
+      <li class="nav-item"><button class="nav-link py-1" data-bs-toggle="pill" data-bs-target="#t-c">By month (₹)</button></li>
+      <li class="nav-item"><button class="nav-link py-1" data-bs-toggle="pill" data-bs-target="#t-d">Ageing mix (%)</button></li>
+    </ul>
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="t-a">
+        <div class="table-responsive"><table class="xl-table num">
+          <thead><tr><th class="text-start">Month end</th><th>0-30 Days</th><th>31-60 Days</th><th>61-90 Days</th><th>Above 90 Days</th><th>Above 180 Days</th><th>Total</th></tr></thead>
+          <tbody>{% for m in r.lakh_a %}<tr class="{% if m.current %}cur{% endif %}"><th class="text-start">{{ m.month }}{% if m.current %}*{% endif %}</th>{% for v in m.v %}<td>{{ v|lakh }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+        </table></div>
+        <div class="foot">Above 180 is part of Above 90 (not added to Total).</div>
+      </div>
+      <div class="tab-pane fade" id="t-b">
+        <div class="table-responsive"><table class="xl-table num">
+          <thead><tr><th class="text-start">Month end</th><th>0-30 Days</th><th>31-60 Days</th><th>Above 60 Days</th><th>Above 90 Days</th><th>Above 180 Days</th><th>Total</th></tr></thead>
+          <tbody>{% for m in r.lakh_b %}<tr class="{% if m.current %}cur{% endif %}"><th class="text-start">{{ m.month }}{% if m.current %}*{% endif %}</th>{% for v in m.v %}<td>{{ v|lakh }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+        </table></div>
+        <div class="foot">Above 90 / Above 180 are part of Above 60.</div>
+      </div>
+      <div class="tab-pane fade" id="t-c">
+        <div class="table-responsive"><table class="xl-table num small-font">
+          <thead><tr><th class="text-start">Month end</th>{% for b in r.buckets %}<th>{{ b }}</th>{% endfor %}<th>Total</th></tr></thead>
+          <tbody>{% for m in r.by_month %}<tr><th class="text-start">{{ m.month }}</th>{% for v in m.values %}<td>{{ v|zero_dash }}</td>{% endfor %}<th>{{ m.total|zero_dash }}</th></tr>{% endfor %}</tbody>
+        </table></div>
+      </div>
+      <div class="tab-pane fade" id="t-d">
+        <div class="table-responsive"><table class="xl-table num small-font">
+          <thead><tr><th class="text-start">Month end</th>{% for b in r.buckets %}<th>{{ b }}</th>{% endfor %}<th>Total</th></tr></thead>
+          <tbody>{% for m in r.by_month %}<tr><th class="text-start">{{ m.month }}</th>{% for v in m.mix %}<td>{% if v is None %}#DIV/0!{% else %}{{ v|pct }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- analytics: month-end trend (left) + top customers (right) -->
+  <div class="row g-3 mt-1 analytics-row">
+    <div class="col-xl-8">
+      <section class="xl-card h-100">
+        <h2>Month-end Non-GRN trend<span class="src">₹ Lakhs per month-end · hover a point for value &amp; change · * = as on {{ r.as_on|date:"d M" }}</span></h2>
+        <div class="trend-grid" id="trend-grid"></div>
+        <div class="foot">Same figures as the "Above-60 view (₹ L)" summary table above. Above 60 / 90 / 180 overlap (Above 180 is part of Above 90, which is part of Above 60).</div>
+      </section>
+    </div>
+    <div class="col-xl-4">
+      <section class="xl-card chart-card h-100">
+        <h2>Top 10 customers<span class="src">current Non-GRN, ₹ Lakhs</span></h2>
+        <div class="chart-box top-box"><canvas id="topChart" aria-label="Top 10 customers by Non-GRN" role="img"></canvas></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- B2:N11 -->
+  <div class="section-title" id="ageing-table">Month-end ageing (₹)</div>
+  <section class="xl-card">
+    <div class="table-responsive">
+      <table class="xl-table num heat-table">
+        <thead><tr><th class="text-start">Month end</th>{% for m in r.months %}<th class="{% if forloop.counter0 == r.current_idx %}cur{% endif %}">{{ m }}{% if forloop.counter0 == r.current_idx %}*{% endif %}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for row in r.aging_rows %}
+          <tr><th class="text-start">{{ row.bucket }}</th>{% for v in row.values %}<td class="heat" data-v="{{ v|floatformat:2 }}">{{ v|zero_dash }}</td>{% endfor %}</tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr><th class="text-start">Total</th>{% for v in r.aging_totals %}<th>{{ v|zero_dash }}</th>{% endfor %}</tr></tfoot>
+      </table>
+    </div>
+    <div class="foot">=SUMIFS(Combine!month-end amount, Combine!month-end bucket, bucket). * running month uses today's date ({{ r.as_on|date:"d.m.Y" }}) instead of the month end. Darker cells = larger amounts.</div>
+  </section>
+
+  <!-- KPIs / movement / speed -->
+  <div class="row g-3 mt-1">
+    <div class="col-xl-4">
+      <section class="xl-card h-100">
+        <h2>Current position</h2>
+        <div class="table-responsive">
+        <table class="xl-table num">
+          <thead><tr><th class="text-start"></th><th>₹ Lakhs</th><th>%</th><th>Lines</th></tr></thead>
+          <tbody>
+            {% for k in r.kpi_current %}
+            <tr><th class="text-start {% if not forloop.first %}ps-4 fw-normal{% endif %}">{{ k.label }}</th><td>{{ k.lakh|lakh }}</td><td>{{ k.pct|pct }}</td><td>{{ k.count|inr }}</td></tr>
+            {% endfor %}
+            <tr><th class="text-start fw-normal">Customers with Non-GRN</th><td></td><td></td><td>{{ r.cust_pos }}</td></tr>
+            <tr><th class="text-start fw-normal">Customers with &gt;90 days</th><td></td><td></td><td>{{ r.cust_90 }}</td></tr>
+            <tr><th class="text-start fw-normal">Top 10 customers' share</th><td></td><td>{{ r.top10_share|pct }}</td><td></td></tr>
+          </tbody>
+        </table>
+        </div>
+      </section>
+    </div>
+    <div class="col-xl-4">
+      <section class="xl-card h-100">
+        <h2>Month-on-month movement<span class="src">₹ Lakhs</span></h2>
+        <div class="table-responsive">
+        <table class="xl-table num">
+          <tbody>
+          {% for m in r.movement %}
+            <tr class="{% if 'Closing' in m.label %}fw-semibold{% endif %}"><th class="text-start fw-normal">{{ m.label }}</th>
+              <td>{% if m.kind == 'date' %}{{ m.value|date:"d M Y" }}{% elif m.kind == 'pct' %}{{ m.value|pct }}{% else %}{{ m.value|lakh }}{% endif %}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </section>
+    </div>
+    <div class="col-xl-4">
+      <section class="xl-card h-100">
+        <h2>Billing &amp; GRN speed</h2>
+        <div class="table-responsive">
+        <table class="xl-table num">
+          <tbody>
+          {% for b in r.billing %}
+            <tr><th class="text-start fw-normal">{{ b.label }}</th>
+              <td>{% if b.kind == 'pct' %}{{ b.value|pct }}{% elif b.kind == 'num' %}{{ b.value|num1 }}{% else %}{{ b.value|lakh }}{% endif %}{% if b.pct is not None %} <span class="text-muted small">({{ b.pct|pct }})</span>{% endif %}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- G33:M50 -->
+  <div class="section-title">Top 15 customers by current Non-GRN</div>
+  <section class="xl-card">
+    <div class="table-responsive">
+    <table class="xl-table num">
+      <thead><tr><th class="text-start">#</th><th class="text-start">Customer</th><th>Non-GRN ₹ L</th><th>% of total</th><th>&gt;90 days ₹ L</th><th>Open lines</th><th>Avg days to GRN</th><th>Oldest open (days)</th></tr></thead>
+      <tbody>
+      {% for c in r.top %}
+        <tr><td class="text-start"><span class="rank">{{ forloop.counter }}</span></td><th class="text-start">{{ c.customer }}</th>
+          <td class="databar" style="--w: {{ c.pct|floatformat:4 }}">{{ c.lakh|lakh }}</td><td>{{ c.pct|pct }}</td>
+          <td class="{% if not c.above90 %}muted-zero{% endif %}">{{ c.above90|lakh }}</td><td>{{ c.lines }}</td><td>{{ c.avg_days|num1 }}</td>
+          <td class="{% if c.oldest > 180 %}text-danger fw-semibold{% elif c.oldest > 90 %}text-warning-emphasis{% endif %}">{{ c.oldest }}</td></tr>
+      {% endfor %}
+      </tbody>
+      <tfoot><tr><th></th><th class="text-start">Top 15 total</th><th>{{ r.top_total.lakh|lakh }}</th><th>{{ r.top_total.pct|pct }}</th><th>{{ r.top_total.above90|lakh }}</th><th>{{ r.top_total.lines }}</th><th></th><th></th></tr></tfoot>
+    </table>
+    </div>
+  </section>
+
+</div>
+{% endwith %}
+{{ r.trend|json_script:"trend-data" }}
+<script id="top-data" type="application/json">[{% for c in r.top|slice:":10" %}{"name": "{{ c.customer|escapejs }}", "v": {{ c.lakh|floatformat:2 }}}{% if not forloop.last %},{% endif %}{% endfor %}]</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n) => css.getPropertyValue(n).trim();
+  const RAMP = ['--d1', '--d2', '--d3', '--d4', '--d5'].map(tok);   // validated ordinal ramp: young → old
+  const INK2 = tok('--ink-2'), INK3 = tok('--ink-3'), GRID = tok('--line-2'), SURFACE = '#ffffff';
+  const fmt = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = INK3;
+
+  // ---- heat shading on the ageing table (single blue hue, intensity = amount)
+  const cells = [...document.querySelectorAll('.heat-table td.heat')];
+  const max = Math.max(...cells.map((c) => +c.dataset.v || 0));
+  cells.forEach((c) => {
+    const v = +c.dataset.v || 0;
+    if (v > 0) c.style.background = `rgba(37, 106, 191, ${(0.05 + 0.3 * v / max).toFixed(3)})`;
+    else c.classList.add('muted-zero');
+  });
+
+  // ---- month-end trend: small multiples, one per age view
+  const trend = JSON.parse(document.getElementById('trend-data').textContent);
+  const LINE = RAMP[2];
+  const grid = document.getElementById('trend-grid');
+  const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + fmt.format(Math.abs(v));
+  const changes = (vals) => vals.map((v, i) => {
+    if (i === 0) return null;
+    const d = v - vals[i - 1];
+    return { d, pct: vals[i - 1] ? d / vals[i - 1] : null };
+  });
+  trend.series.forEach((s, k) => {
+    const panel = document.createElement('div');
+    panel.className = 'trend-panel';
+    const last = s.values[s.values.length - 1];
+    panel.innerHTML = `<div class="trend-head"><span class="trend-name">${s.name}</span>` +
+      `<span class="trend-last">₹ ${fmt.format(last)} L</span></div>` +
+      `<div class="trend-box"><canvas aria-label="${s.name} month-end trend" role="img"></canvas></div>`;
+    grid.appendChild(panel);
+    const ch = changes(s.values);
+    const lo = Math.min(...s.values), hi = Math.max(...s.values);
+    const pad = (hi - lo || hi || 1) * 0.15;
+    new Chart(panel.querySelector('canvas'), {
+      type: 'line',
+      data: { labels: trend.months, datasets: [{ data: s.values, borderColor: LINE, backgroundColor: LINE,
+        borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, pointBorderColor: SURFACE, pointBorderWidth: 2,
+        tension: 0, clip: false }] },
+      options: {
+        maintainAspectRatio: false,
+        layout: { padding: { top: 6, left: 2, right: 8, bottom: 0 } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#16202a', padding: 10, displayColors: false,
+            callbacks: {
+              title: (items) => `${s.name} · ${items[0].label}`,
+              label: (c) => `₹ ${fmt.format(c.parsed.y)} L`,
+              afterLabel: (c) => {
+                const x = ch[c.dataIndex];
+                if (!x) return 'first month';
+                return `vs previous: ${signed(x.d)} L` + (x.pct === null ? '' : ` (${(x.pct * 100).toFixed(1)}%)`);
+              },
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: INK2, maxRotation: 0, autoSkip: false, font: { size: 9.5 },
+               callback(v) { return this.getLabelForValue(v).slice(0, 3) + (this.getLabelForValue(v).endsWith('*') ? '*' : ''); } } },
+          y: { suggestedMin: Math.max(0, lo - pad), suggestedMax: hi + pad, border: { display: false },
+               grid: { color: GRID }, ticks: { maxTicksLimit: 3, font: { size: 9.5 }, callback: (v) => v.toLocaleString('en-IN') } },
+        },
+      },
+    });
+  });
+
+  // ---- top customers: horizontal bars, value at the tip
+  const top = JSON.parse(document.getElementById('top-data').textContent);
+  const tipLabels = {
+    id: 'tipLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.font = '600 11.5px Inter, system-ui, sans-serif';
+      ctx.fillStyle = INK2;
+      ctx.textBaseline = 'middle';
+      chart.getDatasetMeta(0).data.forEach((bar, i) => ctx.fillText(fmt.format(top[i].v), bar.x + 6, bar.y));
+      ctx.restore();
+    },
+  };
+  new Chart(document.getElementById('topChart'), {
+    type: 'bar',
+    data: { labels: top.map((t) => t.name), datasets: [{ data: top.map((t) => t.v), backgroundColor: RAMP[2],
+      maxBarThickness: 16, borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: false }] },
+    options: {
+      indexAxis: 'y', maintainAspectRatio: false, layout: { padding: { right: 56 } },
+      plugins: { legend: { display: false },
+        tooltip: { backgroundColor: '#16202a', padding: 10, callbacks: { label: (c) => ` ₹ ${fmt.format(c.parsed.x)} L` } } },
+      scales: {
+        x: { grid: { color: GRID }, border: { display: false }, ticks: { maxTicksLimit: 5 } },
+        y: { grid: { display: false }, ticks: { color: INK2, autoSkip: false, font: { size: 11 },
+             callback(v) { const s = this.getLabelForValue(v); return s.length > 24 ? s.slice(0, 23) + '…' : s; } } },
+      },
+    },
+    plugins: [tipLabels],
+  });
+})();
+</script>
+{% endblock %}

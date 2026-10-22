@@ -1,0 +1,165 @@
+{% extends "nongrn/base.html" %}
+{% load nongrn_fmt %}
+{% block title %}Customer Dashboard{% endblock %}
+{% block page_title %}Customer Dashboard<small>4 pivots · Excel slicers &amp; filters</small>{% endblock %}
+
+{% block content %}
+<div class="sheet-page">
+  <div class="sheet-head">
+    <h1>Customer-wise Non-GRN<small>As on {{ as_on|date:"d M Y" }} · amounts in ₹ (Item Net Amount) · use the filters above each pivot</small></h1>
+  </div>
+
+<form method="get" id="dash-form">
+  <div class="row g-3">
+    <!-- 1. PT_Cust_Bucket with slicers -->
+    <div class="col-12">
+      <section class="xl-card">
+        <h2>1. Current Non-GRN by Customer × Age Bucket</h2>
+        <div class="dd-filters">
+          {% for f in ui_bucket %}
+                    <div class="dd-filter dropdown{% if f.chosen %} active{% endif %}">
+            <span class="dd-label">{{ f.label }}</span>
+            <button type="button" class="dd-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+              <span class="dd-value">{% if not f.chosen %}All{% elif f.chosen|length == 1 %}{{ f.chosen.0 }}{% else %}{{ f.chosen|join:", " }}{% endif %}</span>
+              <i class="bi bi-chevron-down"></i>
+            </button>
+            <div class="dropdown-menu dd-menu">
+              <button type="button" class="dd-opt dd-all{% if not f.chosen %} on{% endif %}" data-clear="{{ f.param }}"><i class="bi bi-check2"></i>All</button>
+              {% for o in f.options %}
+              <label class="dd-opt{% if o in f.chosen %} on{% endif %}">
+                <input type="checkbox" name="{{ f.param }}" value="{{ o }}" {% if o in f.chosen %}checked{% endif %} hidden><i class="bi bi-check2"></i>{{ o }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+          {% if ui_bucket|length %}<a class="dd-reset" href="?{% for f in ui_trend %}{% for v in f.chosen %}{{ f.param }}={{ v|urlencode }}&amp;{% endfor %}{% endfor %}{% for f in ui_grn %}{% for v in f.chosen %}{{ f.param }}={{ v|urlencode }}&amp;{% endfor %}{% endfor %}">Reset</a>{% endif %}
+          <div class="input-group input-group-sm line-search"><span class="input-group-text bg-white"><i class="bi bi-search"></i></span><input type="search" class="form-control pivot-search" placeholder="Find customer…"></div>
+        </div>
+        <div class="table-responsive pivot-wrap">
+          <table class="xl-table num pivot">
+            <thead>
+              <tr><th class="text-start">Non-GRN Amt</th><th colspan="{{ p_bucket.columns|length|add:1 }}" class="text-start">Column Labels</th></tr>
+              <tr><th class="text-start">Row Labels</th>{% for c in p_bucket.columns %}<th>{{ c }}</th>{% endfor %}<th>Grand Total</th></tr>
+            </thead>
+            <tbody>{% for r in p_bucket.rows %}<tr><th class="text-start fw-normal">{{ r.label }}</th>{% for v in r.values %}<td>{{ v|inr2 }}</td>{% endfor %}<td class="fw-semibold databar" data-bar="{{ r.total|floatformat:2 }}">{{ r.total|inr2 }}</td></tr>{% endfor %}</tbody>
+            <tfoot><tr><th class="text-start">Grand Total</th>{% for v in p_bucket.grand %}<th>{{ v|inr2 }}</th>{% endfor %}<th>{{ p_bucket.grand_total|inr2 }}</th></tr></tfoot>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- 2. PT_Cust_Trend -->
+    <div class="col-12">
+      <section class="xl-card">
+        <h2>2. Month-end Non-GRN Trend by Customer</h2>
+        <div class="filter-line">
+          {% include "nongrn/_page_filters.html" with filters=ui_trend %}
+          <div class="input-group input-group-sm line-search"><span class="input-group-text bg-white"><i class="bi bi-search"></i></span><input type="search" class="form-control pivot-search" placeholder="Find customer…"></div>
+        </div>
+        <div class="table-responsive pivot-wrap">
+          <table class="xl-table num pivot heat-pivot">
+            <thead><tr><th class="text-start">Row Labels</th>{% for c in p_trend.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for r in p_trend.rows %}<tr><th class="text-start fw-normal">{{ r.label }}</th>{% for v in r.values %}<td class="heat" data-v="{{ v|floatformat:2 }}">{{ v|inr2 }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+            <tfoot><tr><th class="text-start">Grand Total</th>{% for v in p_trend.grand %}<th>{{ v|inr2 }}</th>{% endfor %}</tr></tfoot>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- 3. PT_Cust_GRN -->
+    <div class="col-xl-7">
+      <section class="xl-card">
+        <h2>3. GRN Data Quality &amp; Speed by Customer</h2>
+        <div class="filter-line">
+          {% include "nongrn/_page_filters.html" with filters=ui_grn %}
+          <div class="input-group input-group-sm line-search"><span class="input-group-text bg-white"><i class="bi bi-search"></i></span><input type="search" class="form-control pivot-search" placeholder="Find customer…"></div>
+        </div>
+        <div class="table-responsive pivot-wrap">
+          <table class="xl-table num pivot">
+            <thead>
+              <tr><th class="text-start">Non-GRN Amt by Source</th><th colspan="{{ p_grn.columns|length|add:1 }}" class="text-start">Column Labels</th></tr>
+              <tr><th class="text-start">Row Labels</th>{% for c in p_grn.columns %}<th>{{ c }}</th>{% endfor %}<th>Grand Total</th></tr>
+            </thead>
+            <tbody>{% for r in p_grn.rows %}<tr><th class="text-start fw-normal">{{ r.label }}</th>{% for v in r.values %}<td>{{ v|inr2 }}</td>{% endfor %}<td class="fw-semibold databar" data-bar="{{ r.total|floatformat:2 }}">{{ r.total|inr2 }}</td></tr>{% endfor %}</tbody>
+            <tfoot><tr><th class="text-start">Grand Total</th>{% for v in p_grn.grand %}<th>{{ v|inr2 }}</th>{% endfor %}<th>{{ p_grn.grand_total|inr2 }}</th></tr></tfoot>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- 4. PT_Cust_Days -->
+    <div class="col-xl-5">
+      <section class="xl-card">
+        <h2>4. Avg Days to GRN by Customer (invoices with GRN date)</h2>
+        <div class="pivot-tools"><div class="input-group input-group-sm" style="max-width:280px"><span class="input-group-text bg-white"><i class="bi bi-search"></i></span><input type="search" class="form-control pivot-search" placeholder="Find customer…"></div></div>
+        <div class="table-responsive pivot-wrap">
+          <table class="xl-table num pivot">
+            <thead><tr><th class="text-start">Row Labels</th><th>Avg Days to GRN</th><th>Max Days to GRN</th><th>Lines</th></tr></thead>
+            <tbody>{% for r in p_days.rows %}<tr><th class="text-start fw-normal">{{ r.label }}</th><td>{% if r.avg is None %}#DIV/0!{% else %}{{ r.avg|num1 }}{% endif %}</td><td>{{ r.max|inr }}</td><td>{{ r.lines|inr }}</td></tr>{% endfor %}</tbody>
+            <tfoot><tr><th class="text-start">Grand Total</th><th>{{ p_days.grand.avg|num1 }}</th><th>{{ p_days.grand.max|inr }}</th><th>{{ p_days.grand.lines|inr }}</th></tr></tfoot>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const form = document.getElementById('dash-form');
+  // dropdown filters apply on click; any number of buckets can be ticked
+  document.querySelectorAll('.dd-filter').forEach((dd) => {
+    const boxes = [...dd.querySelectorAll('input[type=checkbox]')];
+    const sync = () => {
+      const n = boxes.filter((b) => b.checked).length;
+      boxes.forEach((b) => b.closest('.dd-opt').classList.toggle('on', b.checked));
+      dd.querySelector('.dd-all').classList.toggle('on', n === 0);
+    };
+    dd.querySelectorAll('label.dd-opt').forEach((opt) => opt.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const cb = opt.querySelector('input');
+      cb.checked = !cb.checked;
+      sync();
+      form.submit();
+    }));
+    dd.querySelector('.dd-all').addEventListener('click', () => {
+      boxes.forEach((b) => { b.checked = false; });
+      form.submit();
+    });
+    sync();
+  });
+  document.querySelectorAll('.page-filter input[type=checkbox]').forEach((cb) => cb.addEventListener('change', () => form.submit()));
+  document.querySelectorAll('.page-filter [data-clear]').forEach(btn => btn.addEventListener('click', () => {
+    form.querySelectorAll(`input[name="${btn.dataset.clear}"]`).forEach(b => b.checked = false);
+    form.submit();
+  }));
+  // pivot search: filters customer rows client-side
+  document.querySelectorAll('.pivot-search').forEach((inp) => {
+    const table = inp.closest('section').querySelector('table.pivot');
+    inp.addEventListener('input', () => {
+      const q = inp.value.trim().toLowerCase();
+      table.tBodies[0].querySelectorAll('tr').forEach((tr) => {
+        tr.style.display = !q || tr.firstElementChild.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  });
+  // data bars (Grand Total) and heat shading (trend)
+  document.querySelectorAll('table.pivot').forEach((t) => {
+    const bars = [...t.querySelectorAll('td[data-bar]')];
+    const bmax = Math.max(...bars.map((c) => Math.abs(+c.dataset.bar) || 0), 1);
+    bars.forEach((c) => c.style.setProperty('--w', (Math.max(0, +c.dataset.bar) / bmax).toFixed(4)));
+  });
+  document.querySelectorAll('table.heat-pivot').forEach((t) => {
+    const cells = [...t.querySelectorAll('td.heat')];
+    const max = Math.max(...cells.map((c) => +c.dataset.v || 0), 1);
+    cells.forEach((c) => {
+      const v = +c.dataset.v || 0;
+      if (v > 0) c.style.background = 'rgba(37, 106, 191, ' + (0.04 + 0.32 * v / max).toFixed(3) + ')';
+      else c.classList.add('muted-zero');
+    });
+  });
+</script>
+{% endblock %}

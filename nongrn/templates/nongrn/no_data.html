@@ -1,0 +1,14 @@
+{% extends "nongrn/base.html" %}
+{% block content %}
+<div class="sheet-page">
+  <div class="xl-card empty mx-auto" style="max-width:620px">
+    <div class="empty-icon"><i class="bi bi-database-add"></i></div>
+    <h2 class="justify-content-center fs-5">No data loaded yet</h2>
+    <p class="text-muted">Upload the ERP exports on <a href="{% url 'nongrn:sources' %}">Sources &amp; uploads</a>, or run <b>Refresh All</b> to read the four source folders – the same queries Power Query runs in the workbook.</p>
+    <form method="post" action="{% url 'nongrn:refresh' %}">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button class="btn btn-brand" {% if refresh_running %}disabled{% endif %}><i class="bi bi-arrow-repeat"></i> Refresh All</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

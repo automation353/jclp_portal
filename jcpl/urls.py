@@ -19,6 +19,9 @@ urlpatterns = [
     # Server-rendered pages. Team Accounts and Login Activity still live here
     # until they're ported into the React portal.
     path("accounts/", include("accounts.urls")),
+    # Non GRN Age — server-rendered module (its own templates), reached from the
+    # OEM Sales "Non GRN" card. Self-contained; does not touch other routes.
+    path("nongrn/", include("nongrn.urls")),
     path("", include("dashboard.urls")),
 ]
 

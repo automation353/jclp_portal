@@ -1,0 +1,309 @@
+{% extends "nongrn/base.html" %}
+{% block title %}Sources{% endblock %}
+{% block page_title %}Sources &amp; uploads<small>the 4 Power Query folders</small>{% endblock %}
+{% block content %}
+<div class="sheet-page src-page">
+  <div class="sheet-head">
+    <h1>Sources &amp; uploads<small>Upload the new ERP export on its source (or drop it on the card). It replaces the old file, is copied to Google Sheets (n8n) and Refresh All runs automatically.</small></h1>
+  </div>
+
+  <div class="src-grid">
+    {% for s in sources %}
+    <section class="src-card">
+      <header class="src-head">
+        <span class="src-icon"><i class="bi bi-folder2"></i></span>
+        <div class="min-w-0 flex-grow-1">
+          <div class="src-title">{{ s.label }}{% if s.daily %}<span class="src-badge">Daily</span>{% endif %}</div>
+          <div class="src-desc">{{ s.desc }}</div>
+        </div>
+        {% if s.latest %}
+          {% if s.age_days == 0 %}<span class="fresh ok">Updated today</span>
+          {% elif s.daily %}<span class="fresh warn" title="Last updated {{ s.age_days }} day{{ s.age_days|pluralize }} ago">Due today</span>
+          {% else %}<span class="fresh muted">Updated {{ s.age_days }} day{{ s.age_days|pluralize }} ago</span>{% endif %}
+        {% else %}<span class="fresh warn">No file</span>{% endif %}
+      </header>
+
+      <div class="src-body">
+        {% if s.latest %}
+          <i class="bi bi-file-earmark-excel sf-icon"></i>
+          <div class="min-w-0 flex-grow-1" title="{{ s.latest.name }}">
+            <div class="sf-name">{{ s.latest.name }}</div>
+            <div class="sf-meta">{{ s.latest.size|filesizeformat }} · {{ s.latest.modified|date:"d M Y, H:i" }}{% if s.daily and s.age_days %} · <span class="sf-late">{{ s.age_days }} day{{ s.age_days|pluralize }} old</span>{% endif %}{% if s.files|length > 1 %} · <span title="{% for f in s.files|slice:'1:' %}{{ f.name }}&#10;{% endfor %}">+{{ s.files|length|add:"-1" }} other</span>{% endif %}</div>
+          </div>
+        {% else %}
+          <i class="bi bi-file-earmark sf-icon muted"></i>
+          <div class="min-w-0 flex-grow-1"><div class="sf-meta">{% if s.exists %}No file yet{% else %}Folder not found{% endif %}</div></div>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data" class="upload-form">{% csrf_token %}
+          <input type="hidden" name="source" value="{{ s.key }}">
+          <input type="file" name="file" accept=".xlsx,.xlsm,.xls" class="d-none" required>
+          <button type="button" class="btn btn-ink btn-sm dropzone" aria-label="Upload a new file to {{ s.label }}">
+            <i class="bi bi-upload"></i> {% if s.latest %}Replace{% else %}Upload{% endif %}</button>
+        </form>
+      </div>
+
+      <footer class="src-foot">
+        <span class="src-path" title="{{ s.path }}"><i class="bi bi-folder2"></i><span>{{ s.path }}</span></span>
+        <span class="src-hint">or drop an .xlsx on this card</span>
+      </footer>
+      <div class="drop-veil"><i class="bi bi-cloud-arrow-up"></i>Drop to replace the {{ s.label }} file</div>
+    </section>
+    {% endfor %}
+  </div>
+
+  <section class="xl-card log-card mt-4">
+    <div class="log-head">
+      <h2 class="m-0">Activity log<span class="src">uploads &amp; Refresh All · newest first</span></h2>
+      <div class="log-tools">
+        <div class="seg" role="tablist">
+          <button type="button" class="on" data-kind="">All <b>{{ log_count }}</b></button>
+          <button type="button" data-kind="upload">Uploads <b>{{ n_uploads }}</b></button>
+          <button type="button" data-kind="refresh">Refresh <b>{{ n_refresh }}</b></button>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#clear-modal" {% if not log_count %}disabled{% endif %}>
+          <i class="bi bi-trash3"></i> Clear logs</button>
+      </div>
+    </div>
+    <div class="table-responsive">
+    <table class="log-table">
+      <thead><tr><th>When</th><th>Activity</th><th>Details</th><th>By</th><th class="text-end">Time taken</th><th>Status</th></tr></thead>
+      <tbody>
+      {% if refresh_running %}
+        <tr class="log-row" data-kind="refresh">
+          <td class="when"><div>Now</div></td>
+          <td><span class="kind refresh"><i class="bi bi-arrow-repeat"></i>Refresh All</span></td>
+          <td class="det"><div class="det-title">Reading the source folders…</div></td><td class="by"></td><td></td>
+          <td><span class="stat running">Running</span></td></tr>
+      {% endif %}
+      {% for g in logs %}
+        <tr class="log-row" data-kind="{{ g.kind }}">
+          <td class="when"><div>{{ g.at|date:"d M Y" }}</div><small>{{ g.at|date:"H:i:s" }}</small></td>
+          <td>{% if g.kind == 'upload' %}<span class="kind upload"><i class="bi bi-cloud-arrow-up"></i>Upload</span>
+              {% else %}<span class="kind refresh"><i class="bi bi-arrow-repeat"></i>Refresh All</span>{% endif %}</td>
+          <td class="det">
+            {% if g.kind == 'upload' %}
+              <div class="det-title" title="{{ g.title }}">{{ g.title }}</div>
+              <div class="det-sub">{{ g.source }}{% if g.file_size %} · {{ g.file_size|filesizeformat }}{% endif %}{% if g.link %} · <a href="{{ g.link }}" target="_blank" rel="noopener">Google Sheet <i class="bi bi-box-arrow-up-right"></i></a>{% endif %}</div>
+            {% else %}
+              <div class="det-title" title="{{ g.reason }}">{% if g.reason %}{{ g.reason|capfirst }}{% else %}Manual refresh{% endif %}</div>
+            {% endif %}
+            {% if g.detail %}<div class="det-msg{% if g.status == 'failed' %} err{% endif %}" title="{{ g.detail }}">{{ g.detail|truncatechars:220 }}</div>{% endif %}
+          </td>
+          <td class="by">{{ g.user|default:"–" }}</td>
+          <td class="text-end num">{{ g.duration_text|default:"–" }}</td>
+          <td><span class="stat {{ g.status }}">{{ g.get_status_display }}</span></td>
+        </tr>
+      {% endfor %}
+      {% if not logs and not refresh_running %}
+        <tr><td colspan="6" class="log-empty"><i class="bi bi-journal-text"></i><div>No activity yet</div><small>Uploads and Refresh All runs will appear here.</small></td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+    </div>
+    {% if log_count > 100 %}<div class="foot">Showing the latest 100 of {{ log_count }} entries.</div>{% endif %}
+  </section>
+</div>
+
+<div class="modal fade" id="clear-modal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content">
+    <form method="post" action="{% url 'nongrn:clear_logs' %}">{% csrf_token %}
+      <div class="modal-body p-4">
+        <div class="fw-semibold fs-6 mb-1">Clear the activity log?</div>
+        <div class="small text-muted">All {{ log_count }} entr{{ log_count|pluralize:"y,ies" }} will be removed. Files, data and the Non GRN Age workbook are not affected.</div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sm btn-danger"><i class="bi bi-trash3"></i> Clear logs</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
+<div class="modal fade" id="upload-modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content upload-pop">
+    <div class="modal-body p-4">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="up-icon" id="up-icon"><div class="spinner-border text-success"></div></div>
+        <div class="flex-grow-1 min-w-0">
+          <div class="fw-semibold fs-5" id="up-title">Uploading…</div>
+          <div class="small text-muted text-truncate" id="up-file"></div>
+        </div>
+      </div>
+      <ol class="up-steps">
+        <li id="step-portal" class="active"><span>Uploading to portal</span><b id="up-pct">0%</b></li>
+        <li id="step-n8n"><span>Converting to Google Sheet (n8n)</span><b id="up-time"></b></li>
+        <li id="step-refresh"><span>Refresh All &amp; build Non GRN Age.xlsx</span><b id="up-rtime"></b></li>
+      </ol>
+      <div class="progress up-progress" role="progressbar">
+        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" id="up-bar" style="width:0%"></div>
+      </div>
+      <div class="up-msg mt-3 d-none" id="up-msg"></div>
+      <div class="text-end mt-3 d-none" id="up-actions">
+        <a class="btn btn-sm btn-outline-success d-none" id="up-link" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Open Google Sheet</a>
+        <button class="btn btn-sm btn-secondary" id="up-close">Close</button>
+      </div>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const modal = new bootstrap.Modal(document.getElementById('upload-modal'));
+  const $ = (id) => document.getElementById(id);
+  let timer;
+
+  function setStep(id, state) { $(id).className = state; }
+  const STEPS = ['step-portal', 'step-n8n', 'step-refresh'];
+
+  function clock(el) {                       // elapsed-time counter for the running step
+    clearInterval(timer);
+    const t0 = Date.now();
+    timer = setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      $(el).textContent = (s >= 60 ? Math.floor(s / 60) + 'm ' : '') + (s % 60) + 's';
+    }, 1000);
+  }
+
+  function busy(title) {
+    $('up-title').textContent = title;
+    $('up-bar').className = 'progress-bar up-indeterminate';
+    $('up-bar').style.width = '100%';
+  }
+
+  function finish(ok, title, msg, link) {
+    clearInterval(timer);
+    $('up-bar').className = 'progress-bar ' + (ok ? 'bg-success' : 'bg-danger');
+    $('up-bar').style.width = '100%';
+    $('up-icon').innerHTML = ok ? '<i class="bi bi-check-circle-fill text-success"></i>'
+                                : '<i class="bi bi-x-circle-fill text-danger"></i>';
+    $('up-title').textContent = title;
+    $('up-msg').className = 'up-msg mt-3 ' + (ok ? 'ok' : 'err');
+    $('up-msg').textContent = msg;
+    if (!ok) {
+      const running = STEPS.find((id) => $(id).className === 'active');
+      if (running) setStep(running, 'failed');
+      $('up-actions').classList.remove('d-none');
+      return;
+    }
+    if (link) {
+      $('up-link').href = link;
+      $('up-link').classList.remove('d-none');
+      $('up-actions').classList.remove('d-none');
+    }
+    setTimeout(() => { modal.hide(); location.reload(); }, link ? 4000 : 2000);
+  }
+
+  // Step 3: wait for the background Refresh All started by the upload
+  function waitForRefresh(msg, link) {
+    setStep('step-refresh', 'active');
+    busy('Refreshing data & building Non GRN Age.xlsx…');
+    clock('up-rtime');
+    const poll = () => fetch(NONGRN.refreshStatusUrl).then((r) => r.json()).then((st) => {
+      if (st.running) { setTimeout(poll, 2000); return; }
+      if (st.last && st.last.status === 'failed') {
+        finish(false, 'Refresh All failed', msg + ' But the portal data could not be refreshed: ' + st.last.message, null);
+      } else {
+        setStep('step-refresh', 'done');
+        finish(true, 'File uploaded', msg + ' Portal data refreshed and Non GRN Age.xlsx rebuilt.', link);
+      }
+    }).catch(() => setTimeout(poll, 3000));
+    poll();
+  }
+
+  function reset(name) {
+    $('up-icon').innerHTML = '<div class="spinner-border text-success"></div>';
+    $('up-title').textContent = 'Uploading…';
+    $('up-file').textContent = name;
+    $('up-pct').textContent = '0%';
+    $('up-time').textContent = '';
+    $('up-rtime').textContent = '';
+    STEPS.forEach((id) => setStep(id, ''));
+    setStep('step-portal', 'active');
+    $('up-bar').className = 'progress-bar progress-bar-striped progress-bar-animated bg-success';
+    $('up-bar').style.width = '0%';
+    $('up-msg').className = 'up-msg mt-3 d-none';
+    $('up-actions').classList.add('d-none');
+    $('up-link').classList.add('d-none');
+  }
+
+  // drag & drop / click-to-browse on each folder card
+  document.querySelectorAll('form.upload-form').forEach((form) => {
+    const zone = form.querySelector('.dropzone');
+    const input = form.querySelector('input[type=file]');
+    zone.addEventListener('click', () => input.click());
+    zone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', () => { if (input.files.length) form.requestSubmit(); });
+    const card = form.closest('.src-card') || zone;
+    let depth = 0;
+    card.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; card.classList.add('is-over'); });
+    card.addEventListener('dragover', (e) => e.preventDefault());
+    card.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; card.classList.remove('is-over'); } });
+    card.addEventListener('drop', () => { depth = 0; card.classList.remove('is-over'); });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if (!f) return;
+      if (!/\.(xlsx|xlsm|xls)$/i.test(f.name)) { alert('Please drop an Excel file (.xlsx).'); return; }
+      const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files;
+      form.requestSubmit();
+    });
+  });
+
+  document.querySelectorAll('form.upload-form').forEach((form) => form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const file = form.querySelector('input[type=file]').files[0];
+    if (!file) return;
+    reset(file.name);
+    modal.show();
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', location.href);
+    xhr.setRequestHeader('X-Requested-With', 'fetch');
+    xhr.upload.onprogress = (e) => {               // step 1: real upload progress to the portal
+      if (!e.lengthComputable) return;
+      const pct = Math.round((e.loaded / e.total) * 100);
+      $('up-bar').style.width = pct + '%';
+      $('up-pct').textContent = pct + '%';
+    };
+    xhr.upload.onload = () => {                     // step 2: file is on the portal – n8n converts it
+      setStep('step-portal', 'done');
+      setStep('step-n8n', 'active');
+      $('up-pct').textContent = '100%';
+      busy('Converting to Google Sheet…');
+      clock('up-time');
+    };
+    xhr.onload = () => {
+      let r;
+      try { r = JSON.parse(xhr.responseText); }
+      catch (e) { r = { ok: false, message: 'Unexpected reply from the portal (HTTP ' + xhr.status + ')' }; }
+      if (!r.ok) {
+        const bg = r.refreshing ? ' (Refresh All of the portal data continues in the background.)' : '';
+        finish(false, 'Failed to upload', (r.message || 'Unknown error') + bg, null);
+        return;
+      }
+      setStep('step-n8n', 'done');
+      let msg = (r.file || file.name) + ' → ' + (r.folder ? r.folder + ' · ' : '') + r.message + '.';
+      const gone = [...new Set([...(r.replaced || []), ...(r.drive_removed || [])])];
+      if (gone.length) msg += ' Old file(s) removed: ' + gone.join(', ') + '.';
+      if (r.refreshing) waitForRefresh(msg, r.link);
+      else finish(true, 'File uploaded', msg, r.link);
+    };
+    xhr.onerror = () => finish(false, 'Failed to upload', 'Network error – the portal could not be reached.', null);
+    xhr.send(new FormData(form));
+    setTimeout(() => { form.querySelector('input[type=file]').value = ''; }, 0);
+  }));
+
+  $('up-close').onclick = () => { modal.hide(); location.reload(); };
+
+  // activity log: All / Uploads / Refresh
+  document.querySelectorAll('.seg button').forEach((btn) => btn.addEventListener('click', () => {
+    document.querySelectorAll('.seg button').forEach((b) => b.classList.toggle('on', b === btn));
+    document.querySelectorAll('.log-row').forEach((tr) => {
+      tr.hidden = !!btn.dataset.kind && tr.dataset.kind !== btn.dataset.kind;
+    });
+  }));
+})();
+</script>
+{% endblock %}
