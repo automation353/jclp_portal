@@ -417,6 +417,64 @@ def r3ss_from_sheet(request):
     })
 
 
+@api_view(["GET"])
+def r3ss_plan_input(request):
+    """Return the planner's committed Total Plan per item (the Plan Input tab)."""
+    from ppc_data.compute.r3ss_sheet_reader import read_plan_input
+
+    try:
+        vals = read_plan_input()
+    except Exception as exc:
+        log.exception("Plan Input read failed")
+        return Response(
+            {"detail": f"Could not read Plan Input: {exc}"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    return Response({"items": vals, "count": len(vals)})
+
+
+@api_view(["POST"])
+@parser_classes([JSONParser])
+def r3ss_plan_input_save(request):
+    """Save committed Total Plan edits to the Plan Input tab (read-preserve).
+
+    Body: {"items": [{"item_code": ERP, "jolly_code"?: ..., "total_plan": v}],
+           "recompute": bool}. A blank total_plan clears that item's commit.
+    """
+    from ppc_data.compute.r3ss_sheet_reader import (
+        write_plan_input, trigger_recompute,
+    )
+
+    items = request.data.get("items")
+    if not isinstance(items, list):
+        return Response(
+            {"detail": "Body must include an 'items' list."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    res = write_plan_input(items)
+    if not res.get("ok"):
+        return Response(
+            {"detail": "Could not write Plan Input to the sheet.", "result": res},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    compute = None
+    if request.data.get("recompute"):
+        compute = trigger_recompute(force=True)
+
+    notify(
+        "R3SS Plan Input saved",
+        f"{request.user.get_username()} saved {len(items)} Total Plan edit(s).",
+    )
+    return Response({
+        "ok": True,
+        "saved": len(items),
+        "written": res.get("rows"),
+        "compute": compute,
+    })
+
+
 @api_view(["POST"])
 @parser_classes([JSONParser, MultiPartParser])
 def r3ss_recompute_sheet(request):

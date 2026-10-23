@@ -7,6 +7,7 @@ in Django. This is a READ-ONLY export (gviz CSV), never a write.
 
 import csv
 import io
+import json
 import logging
 import os
 import re
@@ -357,3 +358,123 @@ def trigger_recompute(timeout=540, force=False):
         if attempt < 2:
             _time.sleep(5)  # transient/concurrent collision — back off and retry
     return last
+
+
+# ── Human-input: the "Plan Input" tab (committed Total Plan per item) ──────
+# The planner's committed Total Plan lives in its OWN Google Sheet tab, so it
+# survives every R3SS rebuild (the Apps Script reads it and overrides Total Plan
+# during computePlan). Same "sheet-is-the-store, preserve across recompute"
+# pattern RM Sourcing uses for its Quantity Sheet.
+
+_PLAN_INPUT_TAB = "Plan Input"
+_PLAN_INPUT_HEADERS = ["ERP Code", "Jolly Code", "Total Plan"]
+_STATE_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "r3ss_state"
+)
+
+
+def _plan_input_cache_path():
+    return os.path.join(_STATE_DIR, "plan_input.json")
+
+
+def read_plan_input(timeout=60):
+    """Read the 'Plan Input' tab → {ERP Code (upper): total_plan string}.
+
+    Returns {} if the tab is missing/empty. On a read error, falls back to the
+    local JSON cache so the screen can still prefill.
+    """
+    sid = _sheet_id()
+    if sid:
+        url = (
+            f"https://docs.google.com/spreadsheets/d/{sid}/gviz/tq"
+            f"?tqx=out:csv&headers=1&sheet={requests.utils.quote(_PLAN_INPUT_TAB)}"
+        )
+        try:
+            resp = requests.get(url, timeout=timeout)
+            resp.raise_for_status()
+            rows = list(csv.reader(io.StringIO(resp.text)))
+            if rows:
+                norm = [h.strip().lower() for h in rows[0]]
+                try:
+                    ci = norm.index("erp code")
+                    tp = norm.index("total plan")
+                except ValueError:
+                    ci = tp = -1
+                if ci >= 0 and tp >= 0:
+                    out = {}
+                    for r in rows[1:]:
+                        if ci >= len(r):
+                            continue
+                        code = (r[ci] or "").strip().upper()
+                        val = (r[tp] or "").strip() if tp < len(r) else ""
+                        if code and val != "":
+                            out[code] = val
+                    return out
+        except Exception as exc:
+            log.warning("Could not read Plan Input tab: %s", exc)
+    try:
+        with open(_plan_input_cache_path()) as fh:
+            return {str(k).strip().upper(): str(v)
+                    for k, v in json.load(fh).items()}
+    except Exception:
+        return {}
+
+
+def write_plan_input(items, timeout=300):
+    """Persist the planner's Total Plan edits (read-preserve + write the tab).
+
+    `items` = iterable of {"item_code": ERP, "jolly_code"?: ..., "total_plan": v}.
+    Merges onto whatever the tab already holds (untouched items keep their value;
+    a blank value clears that item's commit), writes the whole 'Plan Input' tab
+    back via the Apps Script write_tab action, and caches locally.
+    Returns {"ok": bool, "rows": n, ...}; never raises.
+    """
+    merged = dict(read_plan_input(timeout=30))     # {ERP: total_plan}
+    jolly_by_code = {}
+    for it in items:
+        code = str(it.get("item_code") or "").strip().upper()
+        if not code:
+            continue
+        sval = str(it.get("total_plan", "")).strip()
+        if sval == "":
+            merged.pop(code, None)                 # blank = clear the commit
+        else:
+            merged[code] = sval
+        if it.get("jolly_code"):
+            jolly_by_code[code] = str(it["jolly_code"]).strip()
+
+    rows = [{"ERP Code": code, "Jolly Code": jolly_by_code.get(code, ""),
+             "Total Plan": val} for code, val in sorted(merged.items())]
+
+    # Cache locally (atomic) so compute/screen can serve without the sheet.
+    try:
+        os.makedirs(_STATE_DIR, exist_ok=True)
+        tmp = _plan_input_cache_path() + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(merged, fh)
+        os.replace(tmp, _plan_input_cache_path())
+    except Exception as exc:
+        log.warning("Plan Input cache write failed: %s", exc)
+
+    url = _apps_script_url()
+    if not url:
+        return {"ok": False, "error": "JCLP_PPC_R3SS_APPS_SCRIPT_URL not set",
+                "rows": len(rows)}
+    try:
+        resp = requests.post(
+            url,
+            json={"action": "write_tab", "tab_name": _PLAN_INPUT_TAB,
+                  "headers": _PLAN_INPUT_HEADERS, "rows": rows, "append": False},
+            timeout=timeout, allow_redirects=True,
+        )
+        body = {}
+        try:
+            body = resp.json()
+        except Exception:
+            body = {}
+        ok = (200 <= resp.status_code < 300) and bool(body.get("ok", True))
+        return {"ok": ok, "rows": len(rows), "http_status": resp.status_code,
+                "body_preview": (resp.text or "")[:200]}
+    except Exception as exc:
+        log.exception("Plan Input write_tab failed")
+        return {"ok": False, "error": str(exc), "rows": len(rows)}

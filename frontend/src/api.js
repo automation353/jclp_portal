@@ -208,6 +208,9 @@ export const api = {
     request(`/ppc-data/r3ss/from-sheet/${search ? `?search=${encodeURIComponent(search)}` : ''}`),
   ppcR3ssRecomputeSheet: (force = false) =>
     request('/ppc-data/r3ss/recompute-sheet/', { method: 'POST', body: { force } }),
+  ppcR3ssPlanInput: () => request('/ppc-data/r3ss/plan-input/'),
+  ppcR3ssPlanInputSave: (items, recompute = false) =>
+    request('/ppc-data/r3ss/plan-input/save/', { method: 'POST', body: { items, recompute } }),
   ppcR3ssSummary: () => request('/ppc-data/r3ss/summary/'),
   ppcR3ssCompute: (month) =>
     request('/ppc-data/r3ss/compute/', { method: 'POST', body: { month } }),

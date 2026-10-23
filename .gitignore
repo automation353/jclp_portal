@@ -13,6 +13,7 @@ uploads/
 # RM Sourcing / MTO-MTS runtime caches (regenerated on upload/recompute)
 ppc_data/mto_mts_state/
 ppc_data/rm_sourcing_state/
+ppc_data/r3ss_state/
 
 # Non GRN module runtime state + its source data folders (server-only, large)
 nongrn_state/

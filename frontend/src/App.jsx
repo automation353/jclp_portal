@@ -16,6 +16,7 @@ import PPCDataFeeds from './screens/PPCDataFeeds'
 import PPCDataHub from './screens/PPCDataHub'
 import PPCDataMPS from './screens/PPCDataMPS'
 import PPCDataR3SS from './screens/PPCDataR3SS'
+import PPCPlanInput from './screens/PPCPlanInput'
 import PPCDataUpload from './screens/PPCDataUpload'
 import PPCFeasibility from './screens/PPCFeasibility'
 import PPCForecast from './screens/PPCForecast'
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/ppc-data/demand" element={<RequireAuth><PPCDataDemand /></RequireAuth>} />
         <Route path="/ppc-data/mps" element={<RequireAuth><PPCDataMPS /></RequireAuth>} />
         <Route path="/ppc-data/r3ss" element={<RequireAuth><PPCDataR3SS /></RequireAuth>} />
+        <Route path="/ppc-data/r3ss/plan-input" element={<RequireAuth><PPCPlanInput /></RequireAuth>} />
         <Route path="/ppc-data/rm-sourcing" element={<RequireAuth><PPCRMSourcing /></RequireAuth>} />
         <Route path="/ppc-data/feasibility" element={<RequireAuth><PPCFeasibility /></RequireAuth>} />
         <Route path="/ppc-data/release/:id" element={<RequireAuth><PPCFeasibility /></RequireAuth>} />
