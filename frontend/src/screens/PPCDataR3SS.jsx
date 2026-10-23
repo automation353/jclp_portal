@@ -60,9 +60,7 @@ const GROUPS = {
   plan:    { label: 'Plan' },
   weeks:   { label: 'Weeks' },
   output:  { label: 'Output' },
-  backlog: { label: 'Backlog' },
   perf:    { label: 'Performance' },
-  counts:  { label: 'Colour Counts' },
   days:    { label: 'Days' },
 }
 
@@ -70,7 +68,7 @@ const GROUPS = {
 const DEFAULT_GROUPS = {
   class: true, engg: false, policy: false,
   demand: true, stock: true, plan: true, weeks: true, output: true,
-  backlog: true, perf: true, counts: true, days: true,
+  perf: true, days: true,
 }
 
 /**
@@ -104,7 +102,6 @@ const COLS = [
   { key: 'green_level',    label: 'Green Level',     group: 'policy', num: true },
   { key: 'red_level',      label: 'Red Level',       group: 'policy', num: true },
   { key: 'blue_level',     label: 'Blue Level',      group: 'policy', num: true },
-  { key: 'colour',         label: 'Colour',          group: 'policy' },
   { key: 'ffpl_gl',        label: 'FFPL GL',         group: 'policy', num: true },
   { key: 'safety_stock',   label: 'Safety Stock',    group: 'policy', num: true },
   { key: 'rm_kg',          label: 'RM Kg/1000',      group: 'policy', num: true, dec: 2 },
@@ -113,8 +110,7 @@ const COLS = [
   // Demand Qty
   { key: 'initial_demand',      label: 'Initial',          group: 'demand', num: true, sum: true },
   { key: 'additional_demand',   label: 'Additional',       group: 'demand', num: true, sum: true },
-  { key: 'total_demand',        label: 'Total',            group: 'demand', num: true, bold: true, sum: true },
-  { key: 'demand_init_w1',      label: 'Demand (Init+W1)', group: 'demand', num: true, sum: true, last: true },
+  { key: 'total_demand',        label: 'Total',            group: 'demand', num: true, bold: true, sum: true, last: true },
 
   // Stock
   { key: 'opening_balance',label: 'Opening Balance',  group: 'stock', num: true, sum: true },
@@ -128,6 +124,11 @@ const COLS = [
   // Plan
   { key: 'to_plan',        label: 'To Plan',          group: 'plan', num: true, accent: true, sum: true, last: true },
 
+  // Plan output — next to To Plan (To Plan → Total Plan → Difference, like the reference)
+  { key: 'total_plan',     label: 'Total Plan (HW+MIT)', group: 'output', num: true, sum: true },
+  { key: 'difference',     label: 'Difference',       group: 'output', num: true, sum: true },
+  { key: 'cutting',        label: 'Cutting',          group: 'output', num: true, sum: true, last: true },
+
   // Weekly buckets
   { key: 'w1', label: 'W1', group: 'weeks', num: true, sum: true },
   { key: 'w2', label: 'W2', group: 'weeks', num: true, sum: true },
@@ -135,27 +136,11 @@ const COLS = [
   { key: 'w4', label: 'W4', group: 'weeks', num: true, sum: true },
   { key: 'w5', label: 'W5', group: 'weeks', num: true, sum: true, last: true },
 
-  // Plan output
-  { key: 'total_plan',     label: 'Total Plan (HW+MIT)', group: 'output', num: true, sum: true },
-  { key: 'cutting',        label: 'Cutting',          group: 'output', num: true, sum: true },
-  { key: 'difference',     label: 'Difference',       group: 'output', num: true, sum: true, last: true },
-
-  // Backlog (previous month)
-  { key: 'initial_demand_prev', label: 'Initial Demand (Prev)', group: 'backlog', num: true, sum: true },
-  { key: 'difference_prev',     label: 'Difference (Prev)',     group: 'backlog', num: true, sum: true, last: true },
-
   // Performance
   { key: 'short_production',     label: 'Short Production',       group: 'perf', num: true, sum: true },
   { key: 'adherence_initial',    label: 'Adherence vs Initial',   group: 'perf', num: true, dec: 2 },
   { key: 'adherence_initial_10', label: 'Adherence vs Init+10%',  group: 'perf', num: true, dec: 2 },
-  { key: 'pct_packing',          label: '% Packing Done',         group: 'perf', num: true, dec: 2 },
   { key: 'packing_dpr',          label: 'Packing as per DPR',     group: 'perf', num: true, sum: true, last: true },
-
-  // Colour counts
-  { key: 'count_rl', label: 'Count RL', group: 'counts', num: true },
-  { key: 'count_yl', label: 'Count YL', group: 'counts', num: true },
-  { key: 'count_gl', label: 'Count GL', group: 'counts', num: true },
-  { key: 'count_bl', label: 'Count BL', group: 'counts', num: true, last: true },
 ]
 
 /* ─── Sheet constants ─────────────────────────────────────────── */
@@ -471,6 +456,14 @@ export default function PPCDataR3SS() {
             >
               {showUpload ? '✕ Close Upload' : '⬆ Upload'}
             </button>
+            <Link
+              to="/ppc-data/r3ss/plan-input"
+              className="backbtn"
+              style={{ fontSize: 13, padding: '7px 12px', margin: 0, textDecoration: 'none' }}
+              title="Enter the committed Total Plan per item (human input)"
+            >
+              ✎ Plan Input
+            </Link>
             <a
               href={R3SS_SHEET_URL}
               target="_blank" rel="noopener noreferrer"

@@ -45,6 +45,8 @@ p.sub{color:var(--muted);font-size:14px;margin-bottom:22px}
 .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .page-head > div{flex:1;min-width:0}
 .head-buttons{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+/* Header action buttons always pinned to the right, every dashboard */
+.page-head > .head-buttons,.page-head > .dash-head-actions{flex:0 0 auto;margin-left:auto;justify-content:flex-end}
 .btn-upload{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;
   border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;
   text-decoration:none;cursor:pointer;box-shadow:0 2px 6px rgba(15,123,212,.25);
